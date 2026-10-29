@@ -15,9 +15,9 @@ New architectural decisions get a new ADR in `docs/adr/`, numbered sequentially.
 
 ## Status
 
-- Done: repo scaffold, CI (fmt, clippy, test, NSIS bundles for x64 and ARM64), `deskhand-policy` (tiers, `Permit` gate, context taint, action log; 15 tests), `deskhand-win` window and monitor layer (enumerate, focus, snap, set frame, minimize, restore; every mutation returns a `Placement` as undo data), `deskhand-tools` (`Toolbox`: policy gate, execution, action log, undo, taint propagation; six window tools: `list_windows`, `list_monitors`, `focus_window`, `snap_window`, `move_window`, `minimize_window`).
-- Next: `deskhand-agent`. Provider adapters (Anthropic Messages API, OpenAI-compatible) and the tool-use loop over `Toolbox`: send `definitions()`, `authorize` each tool call, route `NeedsConfirmation` to the UI, `execute` with the permit, and label results with `untrusted` set as untrusted data when returning them to the model.
-- Then: UI panels (chat, confirmation prompt, action log with undo), config, remaining v0.1 tools.
+- Done: repo scaffold, CI (fmt, clippy, test, NSIS bundles for x64 and ARM64), `deskhand-policy` (tiers, `Permit` gate, context taint, action log; 15 tests), `deskhand-win` window and monitor layer (enumerate, focus, snap, set frame, minimize, restore; every mutation returns a `Placement` as undo data), `deskhand-tools` (`Toolbox`: policy gate, execution, action log, undo, taint propagation; six window tools: `list_windows`, `list_monitors`, `focus_window`, `snap_window`, `move_window`, `minimize_window`), `deskhand-agent` (streaming adapters for the Anthropic Messages API and OpenAI-compatible endpoints; tool-use loop over `Toolbox` with confirmation via `AgentHost`, untrusted-content wrapping, step limit; default model `claude-sonnet-5-5`).
+- Next: wire the agent into the Tauri app. `AgentHost` implementation that emits Tauri events and resolves confirmations from the UI; API key in Windows Credential Manager (`keyring`); global hotkey and tray; React panels for chat, confirmation prompts, and the action log with undo.
+- Then: `deskhand-config` (TOML, hot reload), remaining v0.1 tools (UIA window text, clipboard, file search, app launch, layouts).
 
 ## Rules
 
@@ -45,6 +45,10 @@ cargo test --workspace
 # Opt-in: creates and moves a real window to verify placement round-trips
 cargo test -p deskhand-win --test placement -- --ignored
 
+# Opt-in: live model round trip with real window tools (read-only)
+$env:ANTHROPIC_API_KEY = "..."          # and/or $env:DESKHAND_OLLAMA_MODEL = "qwen3"
+cargo test -p deskhand-agent --test live -- --ignored --nocapture
+
 # Dev app
 cd app; npm run tauri dev
 
@@ -57,5 +61,6 @@ cd app; npm run tauri build -- --bundles nsis
 - `tauri build` fails if the `tauri` crate and `@tauri-apps/api` differ in minor version. Upgrade `tauri`, `tauri-build`, `@tauri-apps/api`, and `@tauri-apps/cli` together in one commit.
 - Build output goes to the workspace-root `target\`, not `app\src-tauri\target\`.
 - App identifier is `dev.bd.deskhand`. It sets the app data directory path; changing it breaks existing installs.
+- reqwest uses `native-tls` (SChannel) on Windows. Do not switch to reqwest's default TLS: it is rustls with aws-lc-rs, which needs CMake and NASM and breaks the ARM64 build.
 - `deskhand-win` coordinates are physical pixels and assume a per-monitor-v2 DPI-aware process. Tauri provides this; standalone test binaries must call `SetProcessDpiAwarenessContext` (see `tests/placement.rs`), or DWM frame bounds and window rects disagree under display scaling.
 - Windows 10 22H2 is supported. GitHub-hosted runners are Windows Server, so Windows 10 client behavior (UIA, shell) needs a self-hosted runner or VM to verify.
