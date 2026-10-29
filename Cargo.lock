@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "deskhand-agent",
  "deskhand-config",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand-agent"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "deskhand-policy",
  "deskhand-tools",
@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand-config"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "deskhand-policy",
  "serde",
@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand-policy"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand-tools"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "deskhand-policy",
  "deskhand-win",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "deskhand-win"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "serde",
  "windows 0.62.2",

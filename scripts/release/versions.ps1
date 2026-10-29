@@ -50,6 +50,21 @@ function Read-Versions {
     return $found
 }
 
+# Runs a native command and returns its exit code. Windows PowerShell 5.1
+# turns any stderr output from a native command into a terminating error
+# when $ErrorActionPreference is Stop, and cargo and npm write ordinary
+# progress to stderr, so judge native commands by exit code only.
+function Invoke-Native([scriptblock]$Command) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Command 2>&1 | Out-Null
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 if ($Set) {
     if ($Set -notmatch $semver) { throw "'$Set' is not a semantic version (e.g. 0.2.0 or 0.2.0-beta.1)" }
     foreach ($file in $sources.Keys) {
@@ -61,15 +76,17 @@ if ($Set) {
     }
     Push-Location (Join-Path $root 'app')
     try {
-        npm version $Set --no-git-tag-version --allow-same-version | Out-Null
-        if ($LASTEXITCODE) { throw 'npm version failed' }
+        if (Invoke-Native { npm version $Set --no-git-tag-version --allow-same-version }) {
+            throw 'npm version failed'
+        }
     } finally { Pop-Location }
     Push-Location $root
     try {
         # Rewrites the workspace crates' versions in Cargo.lock.
-        cargo update --workspace --offline 2>$null
-        if ($LASTEXITCODE) { cargo update --workspace }
-        if ($LASTEXITCODE) { throw 'cargo update failed' }
+        if ((Invoke-Native { cargo update --workspace --offline }) -and
+            (Invoke-Native { cargo update --workspace })) {
+            throw 'cargo update failed'
+        }
     } finally { Pop-Location }
 }
 
