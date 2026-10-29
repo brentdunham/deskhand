@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { AGENT_EVENT, api, errorText, type Status, type UiEvent, useTauriEvent } from "./api";
+import {
+  AGENT_EVENT,
+  CONFIG_EVENT,
+  api,
+  errorText,
+  type Status,
+  type UiEvent,
+  useTauriEvent,
+} from "./api";
 import ActionLog from "./components/ActionLog";
 import Chat from "./components/Chat";
 import ConfirmDialog from "./components/ConfirmDialog";
@@ -34,6 +42,7 @@ export default function App() {
   useTauriEvent<UiEvent>(AGENT_EVENT, (e) => {
     if (e.type === "tool_finished") setLogVersion((v) => v + 1);
   });
+  useTauriEvent<null>(CONFIG_EVENT, refresh);
 
   if (error) {
     return (
@@ -43,7 +52,7 @@ export default function App() {
     );
   }
   if (!status) return <main className="onboarding muted">Starting…</main>;
-  if (!status.has_api_key) return <Onboarding onSaved={refresh} />;
+  if (status.needs_key) return <Onboarding onSaved={refresh} />;
 
   return (
     <div className="app">
@@ -66,9 +75,21 @@ export default function App() {
 
       {!status.hotkey_registered && (
         <p className="banner">
-          {status.hotkey} is in use by another app. Open DeskHand from the tray icon.
+          {status.hotkey} is in use by another app. Open DeskHand from the tray icon, or set a
+          different hotkey in the config file.
         </p>
       )}
+      {status.config_error && (
+        <div className="banner banner-error" role="alert">
+          <p>The config file has an error. The previous settings are still in effect.</p>
+          <pre className="config-error">{status.config_error}</pre>
+        </div>
+      )}
+      {status.config_warnings.map((w) => (
+        <p key={w} className="banner">
+          {w}
+        </p>
+      ))}
 
       {/* Chat stays mounted so it keeps receiving events on other tabs. */}
       <div className="view" hidden={tab !== "chat"}>

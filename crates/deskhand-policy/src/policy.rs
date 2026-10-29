@@ -192,6 +192,12 @@ impl Policy {
         }
     }
 
+    /// Replaces every user override, e.g. after the config file reloads.
+    /// Tools missing from `overrides` return to their default policy.
+    pub fn replace_overrides(&mut self, overrides: impl IntoIterator<Item = (String, Override)>) {
+        self.overrides = overrides.into_iter().collect();
+    }
+
     /// Evaluates a tool call without producing a permit. Rules, in order:
     /// unknown tool, Deny override, Irreversible tier, Ask override, tainted
     /// context for taint-sensitive tools, then allow.
@@ -335,6 +341,19 @@ mod tests {
         assert_eq!(
             p.decide("snap_window", &ContextTaint::new()),
             Decision::Allow
+        );
+    }
+
+    #[test]
+    fn replace_overrides_drops_previous_ones() {
+        let mut p = policy();
+        p.set_override("snap_window", Some(Override::Ask));
+        p.replace_overrides([("list_windows".to_owned(), Override::Deny)]);
+        let clean = ContextTaint::new();
+        assert_eq!(p.decide("snap_window", &clean), Decision::Allow);
+        assert_eq!(
+            p.decide("list_windows", &clean),
+            Decision::Deny(DenyReason::UserOverride)
         );
     }
 

@@ -12,12 +12,22 @@ export type ConfirmReason =
   | { kind: "user_override" }
   | { kind: "tainted_context"; sources: string[] };
 
+export type Provider = "anthropic" | "openai_compatible";
+
 export interface Status {
-  has_api_key: boolean;
+  provider: Provider;
   model: string;
+  /** Set whenever a non-default endpoint is configured; API keys go there. */
+  base_url: string | null;
+  has_anthropic_key: boolean;
+  has_openai_key: boolean;
+  needs_key: boolean;
   busy: boolean;
   hotkey: string;
   hotkey_registered: boolean;
+  config_path: string;
+  config_error: string | null;
+  config_warnings: string[];
 }
 
 export type UiEvent =
@@ -66,11 +76,13 @@ export interface ActionEntry {
 
 export const AGENT_EVENT = "agent-event";
 export const CONFIRM_EVENT = "confirm-request";
+export const CONFIG_EVENT = "config-changed";
 
 export const api = {
   status: () => invoke<Status>("status"),
-  setApiKey: (key: string) => invoke<void>("set_api_key", { key }),
-  clearApiKey: () => invoke<void>("clear_api_key"),
+  setApiKey: (provider: Provider, key: string) => invoke<void>("set_api_key", { provider, key }),
+  clearApiKey: (provider: Provider) => invoke<void>("clear_api_key", { provider }),
+  openConfig: () => invoke<void>("open_config"),
   sendMessage: (text: string) => invoke<void>("send_message", { text }),
   cancelTurn: () => invoke<void>("cancel_turn"),
   answerConfirmation: (id: number, approved: boolean) =>

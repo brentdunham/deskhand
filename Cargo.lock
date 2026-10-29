@@ -580,6 +580,12 @@ dependencies = [
 [[package]]
 name = "deskhand-config"
 version = "0.1.0"
+dependencies = [
+ "deskhand-policy",
+ "serde",
+ "tempfile",
+ "toml 1.1.8+spec-1.1.0",
+]
 
 [[package]]
 name = "deskhand-policy"

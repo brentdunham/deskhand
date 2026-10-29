@@ -1,17 +1,31 @@
 import { useState, type FormEvent } from "react";
-import { api, errorText, type Status } from "../api";
+import { api, errorText, type Provider, type Status } from "../api";
 
-function KeyForm({ onSaved, submitLabel }: { onSaved: () => void; submitLabel: string }) {
+const PROVIDER_LABEL: Record<Provider, string> = {
+  anthropic: "Anthropic",
+  openai_compatible: "OpenAI-compatible",
+};
+
+function KeyForm({
+  provider,
+  onSaved,
+  submitLabel,
+}: {
+  provider: Provider;
+  onSaved: () => void;
+  submitLabel: string;
+}) {
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const id = `api-key-${provider}`;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     api
-      .setApiKey(key)
+      .setApiKey(provider, key)
       .then(() => {
         setKey("");
         onSaved();
@@ -22,15 +36,17 @@ function KeyForm({ onSaved, submitLabel }: { onSaved: () => void; submitLabel: s
 
   return (
     <form className="key-form" onSubmit={submit}>
-      <label htmlFor="api-key">Anthropic API key</label>
+      <label htmlFor={id} className="visually-hidden">
+        {PROVIDER_LABEL[provider]} API key
+      </label>
       <input
-        id="api-key"
+        id={id}
         type="password"
         autoComplete="off"
         spellCheck={false}
         value={key}
         onChange={(e) => setKey(e.target.value)}
-        placeholder="sk-ant-…"
+        placeholder={provider === "anthropic" ? "sk-ant-…" : "API key"}
       />
       {error && <p className="notice notice-error">{error}</p>}
       <button type="submit" className="primary" disabled={!key.trim() || saving}>
@@ -40,38 +56,96 @@ function KeyForm({ onSaved, submitLabel }: { onSaved: () => void; submitLabel: s
   );
 }
 
-const KEY_NOTE =
-  "Stored in Windows Credential Manager and sent only to api.anthropic.com. DeskHand can’t display it again.";
+function keyNote(destination: string): string {
+  return `Stored in Windows Credential Manager and sent only to ${destination}. DeskHand can’t display it again.`;
+}
 
 export function Onboarding({ onSaved }: { onSaved: () => void }) {
   return (
     <section className="onboarding">
       <h1>DeskHand</h1>
       <p>DeskHand needs an Anthropic API key to talk to Claude.</p>
-      <KeyForm onSaved={onSaved} submitLabel="Save key" />
-      <p className="muted">{KEY_NOTE}</p>
+      <KeyForm provider="anthropic" onSaved={onSaved} submitLabel="Save key" />
+      <p className="muted">{keyNote("api.anthropic.com")}</p>
+      <p className="muted">
+        To use a local model instead, set <code>kind = "openai_compatible"</code> in the config
+        file.
+      </p>
+      <button type="button" className="ghost" onClick={() => api.openConfig()}>
+        Open config file
+      </button>
     </section>
   );
 }
 
-export default function Settings({ status, onChange }: { status: Status; onChange: () => void }) {
+function KeySection({
+  provider,
+  saved,
+  optional,
+  destination,
+  onChange,
+}: {
+  provider: Provider;
+  saved: boolean;
+  optional: boolean;
+  destination: string;
+  onChange: () => void;
+}) {
   const [error, setError] = useState<string | null>(null);
 
   const remove = () => {
     setError(null);
     api
-      .clearApiKey()
+      .clearApiKey(provider)
       .then(onChange)
       .catch((e) => setError(errorText(e)));
   };
 
   return (
+    <>
+      <h2>
+        {PROVIDER_LABEL[provider]} API key{optional ? " (optional)" : ""}
+        <span className="badge">{saved ? "saved" : "not set"}</span>
+      </h2>
+      <KeyForm provider={provider} onSaved={onChange} submitLabel={saved ? "Replace key" : "Save key"} />
+      <p className="muted">{keyNote(destination)}</p>
+      {error && <p className="notice notice-error">{error}</p>}
+      {saved && (
+        <button type="button" className="danger" onClick={remove}>
+          Remove key
+        </button>
+      )}
+    </>
+  );
+}
+
+export default function Settings({ status, onChange }: { status: Status; onChange: () => void }) {
+  const [openError, setOpenError] = useState<string | null>(null);
+  const openConfig = () => {
+    setOpenError(null);
+    api.openConfig().catch((e) => setOpenError(errorText(e)));
+  };
+
+  const anthropicDestination =
+    status.provider === "anthropic" && status.base_url ? status.base_url : "api.anthropic.com";
+
+  return (
     <section className="settings">
       <dl>
+        <dt>Provider</dt>
+        <dd>{PROVIDER_LABEL[status.provider]}</dd>
         <dt>Model</dt>
         <dd>
           <code>{status.model}</code>
         </dd>
+        {status.base_url && (
+          <>
+            <dt>Endpoint</dt>
+            <dd>
+              <code>{status.base_url}</code>
+            </dd>
+          </>
+        )}
         <dt>Show or hide</dt>
         <dd>
           {status.hotkey}
@@ -79,13 +153,31 @@ export default function Settings({ status, onChange }: { status: Status; onChang
         </dd>
       </dl>
 
-      <h2>API key</h2>
-      <KeyForm onSaved={onChange} submitLabel="Replace key" />
-      <p className="muted">{KEY_NOTE}</p>
-      {error && <p className="notice notice-error">{error}</p>}
-      <button type="button" className="danger" onClick={remove}>
-        Remove key
+      <h2>Config file</h2>
+      <p className="muted path">{status.config_path}</p>
+      <p className="muted">Changes apply as soon as you save the file.</p>
+      {openError && <p className="notice notice-error">{openError}</p>}
+      <button type="button" className="ghost" onClick={openConfig}>
+        Open in Notepad
       </button>
+
+      {status.provider === "anthropic" ? (
+        <KeySection
+          provider="anthropic"
+          saved={status.has_anthropic_key}
+          optional={false}
+          destination={anthropicDestination}
+          onChange={onChange}
+        />
+      ) : (
+        <KeySection
+          provider="openai_compatible"
+          saved={status.has_openai_key}
+          optional
+          destination={status.base_url ?? "the configured endpoint"}
+          onChange={onChange}
+        />
+      )}
     </section>
   );
 }
