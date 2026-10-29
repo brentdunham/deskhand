@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Placeholder icon. Replace before public release. -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#2b5ce6"/>
+  <rect x="232" y="560" width="560" height="64" rx="32" fill="#ffffff"/>
+  <rect x="296" y="624" width="48" height="160" rx="24" fill="#ffffff"/>
+  <rect x="680" y="624" width="48" height="160" rx="24" fill="#ffffff"/>
+  <circle cx="512" cy="384" r="112" fill="#ffffff"/>
+</svg>

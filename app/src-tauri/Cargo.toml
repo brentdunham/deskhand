@@ -1,0 +1,27 @@
+[package]
+name = "deskhand"
+description = "DeskHand desktop application"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+
+deskhand-agent.workspace = true
+deskhand-config.workspace = true
+deskhand-policy.workspace = true
+deskhand-tools.workspace = true
+
+# Does not inherit `unsafe_code = "forbid"`: Tauri macro expansions are outside
+# our control. Application code here should still contain no unsafe blocks.
+[lints.clippy]
+all = { level = "warn", priority = -1 }

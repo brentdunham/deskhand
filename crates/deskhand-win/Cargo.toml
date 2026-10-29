@@ -1,0 +1,20 @@
+[package]
+name = "deskhand-win"
+description = "Win32, UI Automation, window management, and hotkey bindings for DeskHand"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+
+# This is the only crate permitted to contain unsafe code, so it does not
+# inherit the workspace `unsafe_code = "forbid"` lint.
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"

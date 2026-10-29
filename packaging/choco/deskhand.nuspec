@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>deskhand</id>
+    <version>0.1.0</version>
+    <title>DeskHand</title>
+    <authors>The DeskHand Authors</authors>
+    <owners>brentdunham</owners>
+    <projectUrl>https://github.com/brentdunham/deskhand</projectUrl>
+    <projectSourceUrl>https://github.com/brentdunham/deskhand</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/brentdunham/deskhand/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/brentdunham/deskhand#license</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>deskhand desktop ai agent windows productivity mcp</tags>
+    <summary>Open-source, AI-enabled, customizable desktop layer for Windows.</summary>
+    <description>DeskHand is an open-source desktop layer for Windows that puts an AI agent you control on top of your desktop. Bring your own model key or use a local model. Every agent action is permission-gated and logged.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

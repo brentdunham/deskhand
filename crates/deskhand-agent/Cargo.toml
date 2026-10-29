@@ -1,0 +1,16 @@
+[package]
+name = "deskhand-agent"
+description = "Model provider adapters and the tool-use loop for DeskHand"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+deskhand-policy.workspace = true
+deskhand-tools.workspace = true
+
+[lints]
+workspace = true

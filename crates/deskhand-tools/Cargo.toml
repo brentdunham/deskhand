@@ -1,0 +1,18 @@
+[package]
+name = "deskhand-tools"
+description = "Tool definitions and MCP server/client for DeskHand"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+deskhand-policy.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+deskhand-win.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "app/src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/brentdunham/deskhand"
+authors = ["The DeskHand Authors"]
+
+[workspace.dependencies]
+deskhand-agent = { path = "crates/deskhand-agent" }
+deskhand-config = { path = "crates/deskhand-config" }
+deskhand-policy = { path = "crates/deskhand-policy" }
+deskhand-tools = { path = "crates/deskhand-tools" }
+deskhand-win = { path = "crates/deskhand-win" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Unsafe code is confined to deskhand-win, which declares its own lints.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
