@@ -12,7 +12,7 @@ authors.workspace = true
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde.workspace = true
 serde_json.workspace = true
 
@@ -20,6 +20,9 @@ deskhand-agent.workspace = true
 deskhand-config.workspace = true
 deskhand-policy.workspace = true
 deskhand-tools.workspace = true
+tauri-plugin-global-shortcut = "2"
+keyring = { version = "3", features = ["windows-native"] }
+tokio = { version = "1.54.1", features = ["sync"] }
 
 # Does not inherit `unsafe_code = "forbid"`: Tauri macro expansions are outside
 # our control. Application code here should still contain no unsafe blocks.

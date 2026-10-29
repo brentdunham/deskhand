@@ -17,3 +17,16 @@ pub use agent::{
 };
 pub use message::{Block, ChatRequest, Message, Role, StopReason, StreamEvent, ToolCall, Usage};
 pub use provider::{EventStream, Provider, ProviderError};
+
+/// The HTTP client type provider adapters take.
+pub use reqwest::Client as HttpClient;
+
+/// An HTTP client configured for model providers: identifies DeskHand and
+/// fails fast on unreachable endpoints. There is no overall request timeout,
+/// because streamed responses can legitimately run for minutes.
+pub fn http_client() -> reqwest::Result<HttpClient> {
+    reqwest::Client::builder()
+        .user_agent(concat!("DeskHand/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .build()
+}
