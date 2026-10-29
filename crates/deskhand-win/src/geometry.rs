@@ -55,6 +55,24 @@ pub enum SnapTarget {
     Maximize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShowState {
+    Normal,
+    Minimized,
+    Maximized,
+}
+
+/// A window's show state and restored (normal) position. This is the undo data
+/// for every placement change, and what named layouts store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Placement {
+    pub state: ShowState,
+    /// Restored position in workspace coordinates, as `GetWindowPlacement`
+    /// reports it. Only meaningful when passed back to `restore_placement`.
+    pub normal: Rect,
+}
+
 /// The visible frame for `target` within `work`. For [`SnapTarget::Maximize`]
 /// this is the whole work area; callers should use the native maximize state.
 ///

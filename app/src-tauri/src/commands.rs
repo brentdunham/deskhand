@@ -67,7 +67,11 @@ pub fn status(state: State<'_, AppState>) -> Result<Status, String> {
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
         config_error: lock(&state.config_error).clone(),
-        config_warnings: lock(&state.config_warnings).clone(),
+        config_warnings: lock(&state.config_warnings)
+            .iter()
+            .chain(lock(&state.startup_warnings).iter())
+            .cloned()
+            .collect(),
     })
 }
 

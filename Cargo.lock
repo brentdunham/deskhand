@@ -603,6 +603,7 @@ dependencies = [
  "deskhand-win",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

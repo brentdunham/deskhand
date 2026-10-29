@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use deskhand_agent::{HttpClient, Session};
 use deskhand_config::{Config, ConfigError, Watcher};
-use deskhand_tools::{Toolbox, window_tools};
+use deskhand_tools::{Toolbox, layout_tools, window_tools};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
@@ -39,6 +39,9 @@ pub struct AppState {
     /// Set while the file on disk fails to load; cleared on the next good load.
     pub config_error: Mutex<Option<String>>,
     pub config_warnings: Mutex<Vec<String>>,
+    /// Problems found at startup outside the config file (e.g. an unreadable
+    /// layouts store). Shown alongside config warnings.
+    pub startup_warnings: Mutex<Vec<String>>,
     active_hotkey: Mutex<Option<Shortcut>>,
     pub hotkey_registered: AtomicBool,
     watcher: Mutex<Option<Watcher>>,
@@ -179,6 +182,7 @@ fn main() {
         config_path: OnceLock::new(),
         config_error: Mutex::new(None),
         config_warnings: Mutex::new(Vec::new()),
+        startup_warnings: Mutex::new(Vec::new()),
         active_hotkey: Mutex::new(None),
         hotkey_registered: AtomicBool::new(false),
         watcher: Mutex::new(None),
@@ -198,11 +202,20 @@ fn main() {
         .manage(state)
         .setup(|app| {
             let handle = app.handle().clone();
+            let state = app.state::<AppState>();
+
+            // Layouts are app-written data, kept out of the config directory
+            // (%APPDATA%) in %LOCALAPPDATA%. Registered before the config is
+            // applied so overrides for layout tools are recognized.
+            let layouts_path = app.path().app_local_data_dir()?.join("layouts.json");
+            if let Some(w) = layout_tools::register(&mut lock(&state.toolbox), layouts_path)? {
+                lock(&state.startup_warnings).push(w);
+            }
+
             let path = app
                 .path()
                 .app_config_dir()?
                 .join(deskhand_config::FILE_NAME);
-            let state = app.state::<AppState>();
             let _ = state.config_path.set(path.clone());
 
             // Start watching before the first load so an edit made during

@@ -24,4 +24,4 @@ pub mod window;
 
 #[cfg(windows)]
 pub use error::{Result, WinError};
-pub use geometry::{Rect, SnapTarget};
+pub use geometry::{Placement, Rect, ShowState, SnapTarget};

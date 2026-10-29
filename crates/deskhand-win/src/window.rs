@@ -27,6 +27,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{BOOL, PWSTR};
 
 use crate::error::{Context, Result, WinError};
+pub use crate::geometry::{Placement, ShowState};
 use crate::geometry::{Rect, SnapTarget, outer_rect_for_frame, snap_rect};
 use crate::monitor::{self, MonitorId};
 
@@ -54,14 +55,6 @@ impl WindowId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ShowState {
-    Normal,
-    Minimized,
-    Maximized,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub id: WindowId,
@@ -75,16 +68,6 @@ pub struct WindowInfo {
     pub frame: Rect,
     pub monitor: MonitorId,
     pub state: ShowState,
-}
-
-/// A window's show state and restored (normal) position. This is the undo data
-/// for every placement change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Placement {
-    pub state: ShowState,
-    /// Restored position in workspace coordinates, as `GetWindowPlacement`
-    /// reports it. Only meaningful when passed back to [`restore_placement`].
-    pub normal: Rect,
 }
 
 /// Windows that appear in Alt+Tab, in Z order (topmost first).

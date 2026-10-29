@@ -10,11 +10,12 @@ authors.workspace = true
 
 [dependencies]
 deskhand-policy.workspace = true
+deskhand-win.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-[target.'cfg(windows)'.dependencies]
-deskhand-win.workspace = true
+[dev-dependencies]
+tempfile = "3.27.0"
 
 [target.'cfg(windows)'.dev-dependencies]
 deskhand-win = { workspace = true, features = ["test-support"] }
