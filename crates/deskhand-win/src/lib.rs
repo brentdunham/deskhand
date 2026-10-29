@@ -2,3 +2,24 @@
 //!
 //! All unsafe code in DeskHand lives in this crate. Every `unsafe` block must
 //! carry a `// SAFETY:` comment (enforced by `clippy::undocumented_unsafe_blocks`).
+//!
+//! The public API is safe. Window and monitor identifiers are plain handle
+//! values: a stale or invalid one produces an error, never undefined behavior.
+//!
+//! Coordinates are physical pixels. The host process must be per-monitor DPI
+//! aware (Tauri apps are) for positions to be correct on mixed-DPI setups.
+//!
+//! [`geometry`] is platform-independent so its math can be tested anywhere.
+
+pub mod geometry;
+
+#[cfg(windows)]
+mod error;
+#[cfg(windows)]
+pub mod monitor;
+#[cfg(windows)]
+pub mod window;
+
+#[cfg(windows)]
+pub use error::{Result, WinError};
+pub use geometry::{Rect, SnapTarget};
