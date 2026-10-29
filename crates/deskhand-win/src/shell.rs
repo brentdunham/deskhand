@@ -135,8 +135,26 @@ pub fn list_apps() -> Result<Vec<App>> {
 /// Launches an app by its Apps-folder id. Only ids from [`list_apps`] should
 /// be passed; this is not a general command runner.
 pub fn launch(app: &App) -> Result<()> {
-    let target = HSTRING::from(format!("shell:AppsFolder\\{}", app.id));
-    on_sta_thread("launch app", move || {
+    shell_open(
+        "launch app",
+        HSTRING::from(format!("shell:AppsFolder\\{}", app.id)),
+    )
+}
+
+/// Opens a document or folder with its default handler. The caller is
+/// responsible for refusing executable types; this runs whatever handler
+/// Windows has registered.
+pub fn open_path(path: &std::path::Path) -> Result<()> {
+    shell_open("open path", HSTRING::from(path.as_os_str()))
+}
+
+/// Opens a URL in the default browser. The caller validates the scheme.
+pub fn open_url(url: &str) -> Result<()> {
+    shell_open("open URL", HSTRING::from(url))
+}
+
+fn shell_open(what: &'static str, target: HSTRING) -> Result<()> {
+    on_sta_thread(what, move || {
         // SAFETY: COM is initialized on this thread; all strings are valid,
         // NUL-terminated, and outlive the call.
         let h = unsafe { ShellExecuteW(None, w!("open"), &target, None, None, SW_SHOWNORMAL) };
@@ -148,7 +166,7 @@ pub fn launch(app: &App) -> Result<()> {
                 op: "ShellExecuteW",
                 source: windows::core::Error::new(
                     windows::core::HRESULT(-1),
-                    format!("launch failed with code {}", h.0 as usize),
+                    format!("{what} failed with code {}", h.0 as usize),
                 ),
             })
         }
@@ -190,4 +208,56 @@ pub fn default_search_roots() -> Vec<PathBuf> {
         }
     }
     roots
+}
+
+/// Moves a file or folder to the Recycle Bin.
+///
+/// If Windows cannot recycle it (some network drives, items larger than the
+/// bin), it shows its own "permanently delete?" warning instead of silently
+/// destroying the item: `FOF_WANTNUKEWARNING` overrides `FOF_NOCONFIRMATION`
+/// for exactly that case.
+pub fn recycle(path: &std::path::Path) -> Result<()> {
+    use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance};
+    use windows::Win32::UI::Shell::{
+        FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FOF_WANTNUKEWARNING,
+        FOFX_RECYCLEONDELETE, FileOperation, IFileOperation, SHCreateItemFromParsingName,
+    };
+
+    let target = HSTRING::from(path.as_os_str());
+    on_sta_thread("recycle", move || {
+        // SAFETY: COM is initialized on this thread; interface pointers and
+        // strings are valid for the duration of each call and used only on
+        // this thread.
+        unsafe {
+            let op: IFileOperation =
+                CoCreateInstance(&FileOperation, None, CLSCTX_ALL).ctx("create IFileOperation")?;
+            op.SetOperationFlags(
+                FOF_ALLOWUNDO
+                    | FOF_NOCONFIRMATION
+                    | FOF_SILENT
+                    | FOF_NOERRORUI
+                    | FOF_WANTNUKEWARNING
+                    | FOFX_RECYCLEONDELETE,
+            )
+            .ctx("SetOperationFlags")?;
+            let item: IShellItem =
+                SHCreateItemFromParsingName(&target, None).ctx("SHCreateItemFromParsingName")?;
+            op.DeleteItem(&item, None).ctx("DeleteItem")?;
+            op.PerformOperations().ctx("PerformOperations")?;
+            if op
+                .GetAnyOperationsAborted()
+                .ctx("GetAnyOperationsAborted")?
+                .as_bool()
+            {
+                return Err(WinError::Api {
+                    op: "recycle",
+                    source: windows::core::Error::new(
+                        windows::core::HRESULT(-1),
+                        "the operation was cancelled",
+                    ),
+                });
+            }
+            Ok(())
+        }
+    })
 }

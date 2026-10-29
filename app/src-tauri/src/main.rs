@@ -197,8 +197,6 @@ fn main() {
     let search_roots = SearchRoots::default();
     window_tools::register(&mut toolbox).expect("built-in tool names are unique");
     system_tools::register(&mut toolbox).expect("built-in tool names are unique");
-    file_tools::register(&mut toolbox, search_roots.clone())
-        .expect("built-in tool names are unique");
 
     let state = AppState {
         toolbox: Arc::new(Mutex::new(toolbox)),
@@ -241,6 +239,20 @@ fn main() {
             if let Some(w) = layout_tools::register(&mut lock(&state.toolbox), layouts_path)? {
                 lock(&state.startup_warnings).push(w);
             }
+
+            // File tools never touch DeskHand's own directories, even when a
+            // configured root contains them: the config decides where API
+            // keys are sent.
+            let protected = vec![
+                app.path().app_config_dir()?,
+                app.path().app_data_dir()?,
+                app.path().app_local_data_dir()?,
+            ];
+            file_tools::register(
+                &mut lock(&state.toolbox),
+                state.search_roots.clone(),
+                protected,
+            )?;
 
             let path = app
                 .path()

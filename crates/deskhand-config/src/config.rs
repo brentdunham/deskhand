@@ -45,9 +45,10 @@ max_tokens = 4096
 # move_window = "ask"
 # focus_window = "deny"
 
-# Folders that search_files looks in. Empty means Desktop, Documents,
-# Downloads, Pictures, Music, and Videos. Use absolute paths, or ~ for your
-# profile folder, e.g. roots = ["~/Projects", "D:/Archive"]
+# Folders DeskHand may search and work in (open, create folders, move,
+# recycle). File tools refuse anything outside them. Empty means Desktop,
+# Documents, Downloads, Pictures, Music, and Videos. Use absolute paths, or ~
+# for your profile folder, e.g. roots = ["~/Projects", "D:/Archive"]
 [search]
 roots = []
 "#;
