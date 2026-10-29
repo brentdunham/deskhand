@@ -1,0 +1,124 @@
+name: Release
+
+# Push a tag like v0.1.0 to build a draft release. See docs/RELEASING.md.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: version check
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: v
+        name: Tag matches every version file
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.Substring(1)
+          ./scripts/release/versions.ps1 -Expect $version
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+  # The full CI suite: fmt, clippy, tests, and both NSIS installers.
+  ci:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  draft:
+    name: draft release
+    needs: [version, ci]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      # Set the SIGNPATH_API_TOKEN repository secret once signing is set up.
+      SIGNING_CONFIGURED: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: deskhand-*
+          path: artifacts
+
+      - name: Collect installers under stable names
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          $arch = @{ 'x86_64-pc-windows-msvc' = 'x64'; 'aarch64-pc-windows-msvc' = 'arm64' }
+          foreach ($target in $arch.Keys) {
+            $exe = @(Get-ChildItem "artifacts/deskhand-$target" -Filter *.exe)
+            if ($exe.Count -ne 1) { throw "expected one installer for $target, found $($exe.Count)" }
+            Copy-Item $exe[0].FullName "dist/DeskHand-$env:VERSION-$($arch[$target])-setup.exe"
+          }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      # Stub. Fails loudly if the secret exists without an implementation, so
+      # a release can never be unsigned while appearing signed.
+      - name: Sign installers
+        if: env.SIGNING_CONFIGURED == 'true'
+        shell: pwsh
+        run: |
+          Write-Output "::error::SIGNPATH_API_TOKEN is set but signing is not implemented yet. See docs/RELEASING.md."
+          exit 1
+
+      - name: Warn that installers are unsigned
+        if: env.SIGNING_CONFIGURED != 'true'
+        shell: pwsh
+        run: Write-Output "::warning::Code signing is not configured. These installers are unsigned; SmartScreen will warn on install."
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/*.exe | Sort-Object Name | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Chocolatey package
+        shell: pwsh
+        run: |
+          $installer = "dist/DeskHand-$env:VERSION-x64-setup.exe"
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TAG/DeskHand-$env:VERSION-x64-setup.exe"
+          ./scripts/release/pack-choco.ps1 -Version $env:VERSION -Installer $installer -Url $url -OutDir dist
+
+      - name: Create draft release
+        shell: pwsh
+        run: |
+          $signing = if ($env:SIGNING_CONFIGURED -eq 'true') { '' } else {
+            "> **Unsigned build.** Windows SmartScreen will warn on install: choose More info, then Run anyway. Verify the download against SHA256SUMS.txt first.`n`n"
+          }
+          $notes = @"
+          $signing## Install
+
+          - **x64:** ``DeskHand-$env:VERSION-x64-setup.exe``
+          - **ARM64:** ``DeskHand-$env:VERSION-arm64-setup.exe``
+          - **Chocolatey (x64), from the folder containing the .nupkg:** ``choco install deskhand --source . --version $env:VERSION``
+
+          Requires Windows 11, or Windows 10 22H2. The installer is per-machine and asks for administrator rights.
+          "@
+          Set-Content notes.md $notes -Encoding utf8
+
+          # Native commands get no glob expansion in PowerShell: list files explicitly.
+          $assets = @(Get-ChildItem dist -File | ForEach-Object { $_.FullName })
+          $ghArgs = @($env:TAG) + $assets + @('--draft', '--verify-tag', '--generate-notes',
+                    '--title', "DeskHand $env:VERSION", '--notes-file', 'notes.md')
+          if ('${{ needs.version.outputs.prerelease }}' -eq 'true') { $ghArgs += '--prerelease' }
+          gh release create @ghArgs
+          if ($LASTEXITCODE) { throw "gh release create failed" }
+          Write-Output "::notice::Draft release created. Review it at https://github.com/${{ github.repository }}/releases and publish it."
