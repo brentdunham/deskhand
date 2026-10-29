@@ -17,10 +17,10 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use crate::host::Confirmations;
 
-pub const HOTKEY_LABEL: &str = "Ctrl+Alt+Space";
+pub const HOTKEY_LABEL: &str = "Ctrl+Alt+D";
 
 fn hotkey() -> Shortcut {
-    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::Space)
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyD)
 }
 
 pub struct AppState {
