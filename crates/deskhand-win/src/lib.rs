@@ -14,9 +14,13 @@
 pub mod geometry;
 
 #[cfg(windows)]
+pub mod clipboard;
+#[cfg(windows)]
 mod error;
 #[cfg(windows)]
 pub mod monitor;
+#[cfg(windows)]
+pub mod shell;
 #[cfg(all(windows, feature = "test-support"))]
 pub mod test_support;
 #[cfg(windows)]

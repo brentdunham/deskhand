@@ -8,9 +8,13 @@
 //! MCP exposure (server and client) is deferred to v0.2; tool definitions are
 //! already shaped for it (name, description, JSON Schema input).
 
+pub mod file_search;
+pub mod file_tools;
 pub mod layout;
 #[cfg(windows)]
 pub mod layout_tools;
+#[cfg(windows)]
+pub mod system_tools;
 mod toolbox;
 #[cfg(windows)]
 pub mod window_tools;

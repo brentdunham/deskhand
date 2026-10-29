@@ -8,7 +8,7 @@ mod watch;
 
 pub use config::{
     Config, ConfigError, DEFAULT_ANTHROPIC_MODEL, DEFAULT_MAX_TOKENS, FILE_NAME, ProviderConfig,
-    TEMPLATE,
+    SearchConfig, TEMPLATE,
 };
 pub use hotkey::{Hotkey, Key};
 pub use watch::Watcher;

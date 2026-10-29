@@ -44,6 +44,12 @@ max_tokens = 4096
 [tools]
 # move_window = "ask"
 # focus_window = "deny"
+
+# Folders that search_files looks in. Empty means Desktop, Documents,
+# Downloads, Pictures, Music, and Videos. Use absolute paths, or ~ for your
+# profile folder, e.g. roots = ["~/Projects", "D:/Archive"]
+[search]
+roots = []
 "#;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,6 +61,16 @@ pub struct Config {
     /// Tool name to override. Names not registered by any tool are kept
     /// (a plugin may register them later) and reported as warnings.
     pub tools: BTreeMap<String, Override>,
+    pub search: SearchConfig,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct SearchConfig {
+    /// Absolute paths, or `~`-prefixed paths under the profile folder. Empty
+    /// means the standard user folders. Resolved by the app, which knows the
+    /// profile folder.
+    pub roots: Vec<String>,
 }
 
 impl Default for Config {
@@ -63,6 +79,7 @@ impl Default for Config {
             hotkey: "Ctrl+Alt+D".parse().expect("default hotkey is valid"),
             provider: ProviderConfig::default(),
             tools: BTreeMap::new(),
+            search: SearchConfig::default(),
         }
     }
 }
@@ -301,6 +318,13 @@ mod tests {
                 "`{text}` gave `{err}`, expected `{needle}`"
             );
         }
+    }
+
+    #[test]
+    fn parses_search_roots() {
+        let c = Config::parse("[search]\nroots = [\"~/Projects\", \"D:/Archive\"]").unwrap();
+        assert_eq!(c.search.roots, ["~/Projects", "D:/Archive"]);
+        assert!(Config::parse("[search]\nfolders = []").is_err());
     }
 
     #[test]

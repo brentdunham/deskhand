@@ -555,6 +555,7 @@ dependencies = [
  "deskhand-config",
  "deskhand-policy",
  "deskhand-tools",
+ "deskhand-win",
  "keyring",
  "serde",
  "serde_json",

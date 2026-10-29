@@ -12,7 +12,8 @@ use std::time::Duration;
 
 use deskhand_agent::{HttpClient, Session};
 use deskhand_config::{Config, ConfigError, Watcher};
-use deskhand_tools::{Toolbox, layout_tools, window_tools};
+use deskhand_tools::file_tools::{self, SearchRoots};
+use deskhand_tools::{Toolbox, layout_tools, system_tools, window_tools};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
@@ -42,6 +43,8 @@ pub struct AppState {
     /// Problems found at startup outside the config file (e.g. an unreadable
     /// layouts store). Shown alongside config warnings.
     pub startup_warnings: Mutex<Vec<String>>,
+    /// Shared with the `search_files` tool; replaced on each config load.
+    pub search_roots: SearchRoots,
     active_hotkey: Mutex<Option<Shortcut>>,
     pub hotkey_registered: AtomicBool,
     watcher: Mutex<Option<Watcher>>,
@@ -120,6 +123,28 @@ fn apply_config(app: &AppHandle, config: Config) {
         )),
     }
 
+    // Search roots: empty means the standard user folders. Invalid entries
+    // are skipped with a warning rather than failing the whole config.
+    let roots = if config.search.roots.is_empty() {
+        deskhand_win::shell::default_search_roots()
+    } else {
+        let home = deskhand_win::shell::home_folder();
+        config
+            .search
+            .roots
+            .iter()
+            .filter_map(|raw| {
+                deskhand_tools::file_search::resolve_root(raw, home.as_deref())
+                    .map_err(|e| warnings.push(format!("[search] {e}")))
+                    .ok()
+            })
+            .collect()
+    };
+    *state
+        .search_roots
+        .write()
+        .unwrap_or_else(PoisonError::into_inner) = roots;
+
     *lock(&state.config_warnings) = warnings;
     *state.config.write().unwrap_or_else(PoisonError::into_inner) = config;
 }
@@ -169,7 +194,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 fn main() {
     let mut toolbox = Toolbox::new();
+    let search_roots = SearchRoots::default();
     window_tools::register(&mut toolbox).expect("built-in tool names are unique");
+    system_tools::register(&mut toolbox).expect("built-in tool names are unique");
+    file_tools::register(&mut toolbox, search_roots.clone())
+        .expect("built-in tool names are unique");
 
     let state = AppState {
         toolbox: Arc::new(Mutex::new(toolbox)),
@@ -183,6 +212,7 @@ fn main() {
         config_error: Mutex::new(None),
         config_warnings: Mutex::new(Vec::new()),
         startup_warnings: Mutex::new(Vec::new()),
+        search_roots,
         active_hotkey: Mutex::new(None),
         hotkey_registered: AtomicBool::new(false),
         watcher: Mutex::new(None),
