@@ -16,6 +16,8 @@ pub enum WinError {
     /// Windows refused to bring the window to the foreground. This happens when
     /// the calling process is not itself in the foreground.
     ForegroundDenied(WindowId),
+    /// The window's application did not answer within the time limit.
+    NotResponding(WindowId),
 }
 
 impl fmt::Display for WinError {
@@ -25,6 +27,9 @@ impl fmt::Display for WinError {
             Self::WindowGone(id) => write!(f, "window {} no longer exists", id.raw()),
             Self::ForegroundDenied(id) => {
                 write!(f, "Windows refused to focus window {}", id.raw())
+            }
+            Self::NotResponding(id) => {
+                write!(f, "window {} did not respond in time", id.raw())
             }
         }
     }

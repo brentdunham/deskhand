@@ -50,7 +50,7 @@ impl WindowId {
         Self(h.0 as isize)
     }
 
-    fn hwnd(self) -> HWND {
+    pub(crate) fn hwnd(self) -> HWND {
         HWND(self.0 as *mut c_void)
     }
 }
@@ -233,7 +233,7 @@ fn is_cloaked(h: HWND) -> bool {
 }
 
 /// Returns the handle if the window still exists.
-fn live(id: WindowId) -> Result<HWND> {
+pub(crate) fn live(id: WindowId) -> Result<HWND> {
     let h = id.hwnd();
     // SAFETY: IsWindow accepts any value and has no memory preconditions.
     if unsafe { IsWindow(Some(h)) }.as_bool() {

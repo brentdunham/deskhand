@@ -20,6 +20,8 @@ pub mod monitor;
 #[cfg(all(windows, feature = "test-support"))]
 pub mod test_support;
 #[cfg(windows)]
+pub mod uia;
+#[cfg(windows)]
 pub mod window;
 
 #[cfg(windows)]

@@ -35,6 +35,7 @@ fn registers_all_window_tools() {
             "list_windows",
             "minimize_window",
             "move_window",
+            "read_window_text",
             "snap_window",
         ]
     );
@@ -80,6 +81,7 @@ fn refuses_to_act_on_own_windows() {
     for (tool, args) in [
         ("focus_window", json!({ "window_id": own.id() })),
         ("minimize_window", json!({ "window_id": own.id() })),
+        ("read_window_text", json!({ "window_id": own.id() })),
         (
             "snap_window",
             json!({ "window_id": own.id(), "position": "left_half" }),
