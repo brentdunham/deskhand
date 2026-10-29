@@ -10,9 +10,14 @@ authors.workspace = true
 
 [dependencies]
 deskhand-policy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 deskhand-win.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+deskhand-win = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true

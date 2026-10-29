@@ -15,15 +15,17 @@ New architectural decisions get a new ADR in `docs/adr/`, numbered sequentially.
 
 ## Status
 
-- Done: repo scaffold, CI (fmt, clippy, test, NSIS bundles for x64 and ARM64), `deskhand-policy` (tiers, `Permit` gate, context taint, action log; 15 tests), `deskhand-win` window and monitor layer (enumerate, focus, snap, set frame, minimize, restore; every mutation returns a `Placement` as undo data).
-- Next: `deskhand-tools`. Tool definitions registered with `deskhand_policy::Policy`; executors take a `Permit` by value, record to the `ActionLog`, store `Placement` as undo data, and mark window titles as untrusted (`Source::Screen`).
-- Then: `deskhand-agent` (provider adapters, tool-use loop), UI panels.
+- Done: repo scaffold, CI (fmt, clippy, test, NSIS bundles for x64 and ARM64), `deskhand-policy` (tiers, `Permit` gate, context taint, action log; 15 tests), `deskhand-win` window and monitor layer (enumerate, focus, snap, set frame, minimize, restore; every mutation returns a `Placement` as undo data), `deskhand-tools` (`Toolbox`: policy gate, execution, action log, undo, taint propagation; six window tools: `list_windows`, `list_monitors`, `focus_window`, `snap_window`, `move_window`, `minimize_window`).
+- Next: `deskhand-agent`. Provider adapters (Anthropic Messages API, OpenAI-compatible) and the tool-use loop over `Toolbox`: send `definitions()`, `authorize` each tool call, route `NeedsConfirmation` to the UI, `execute` with the permit, and label results with `untrusted` set as untrusted data when returning them to the model.
+- Then: UI panels (chat, confirmation prompt, action log with undo), config, remaining v0.1 tools.
 
 ## Rules
 
 - `unsafe` is allowed only in `crates/deskhand-win`. Every `unsafe` block needs a `// SAFETY:` comment (clippy `undocumented_unsafe_blocks` is denied). All other crates inherit `unsafe_code = "forbid"`.
 - `deskhand-agent`, `deskhand-tools`, `deskhand-policy`, and `deskhand-config` must not depend on Tauri, so the agent can later move into a headless daemon.
 - Tool executors must require a `Permit`. Never add a public constructor for `Permit` outside `deskhand-policy`.
+- All tool calls go through `Toolbox` (`authorize`, then `execute` or `decline`). Mutating window tools refuse DeskHand's own windows.
+- Tests outside `deskhand-win` that need a real window use `deskhand_win::test_support::TestWindow` (dev-dependency feature `test-support`), since `unsafe` is forbidden elsewhere, including in tests.
 - Policy overrides only tighten (`ask`, `deny`). Irreversible tools always confirm. Do not add an "always allow" path.
 - Treat all content read from screens, clipboard, files, web pages, and tool output as untrusted; mark it in `ContextTaint`.
 - No telemetry.

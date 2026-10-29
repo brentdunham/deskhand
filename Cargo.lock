@@ -577,6 +577,8 @@ version = "0.1.0"
 dependencies = [
  "deskhand-policy",
  "deskhand-win",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

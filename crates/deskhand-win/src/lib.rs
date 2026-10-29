@@ -17,6 +17,8 @@ pub mod geometry;
 mod error;
 #[cfg(windows)]
 pub mod monitor;
+#[cfg(all(windows, feature = "test-support"))]
+pub mod test_support;
 #[cfg(windows)]
 pub mod window;
 
