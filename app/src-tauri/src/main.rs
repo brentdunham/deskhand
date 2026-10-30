@@ -324,6 +324,7 @@ fn main() {
             commands::clear_api_key,
             commands::open_config,
             commands::send_message,
+            commands::compare_message,
             commands::cancel_turn,
             commands::answer_confirmation,
             commands::action_log,

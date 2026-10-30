@@ -128,6 +128,17 @@ export default function Settings({ status, onChange }: { status: Status; onChang
 
   const anthropicDestination =
     status.provider === "anthropic" && status.base_url ? status.base_url : "api.anthropic.com";
+  const usesAnthropic = status.provider === "anthropic" || status.compare?.kind === "anthropic";
+  const usesOpenAi =
+    status.provider === "openai_compatible" || status.compare?.kind === "openai_compatible";
+  // One key slot serves every OpenAI-compatible endpoint in use.
+  const openAiDestination =
+    [
+      status.provider === "openai_compatible" ? status.base_url : null,
+      status.compare?.kind === "openai_compatible" ? status.compare.base_url : null,
+    ]
+      .filter((u): u is string => !!u)
+      .join(" and ") || "the configured endpoint";
 
   return (
     <section className="settings">
@@ -151,6 +162,14 @@ export default function Settings({ status, onChange }: { status: Status; onChang
           {status.hotkey}
           {!status.hotkey_registered && <span className="badge warn">unavailable</span>}
         </dd>
+        <dt>Compare with</dt>
+        <dd>
+          {status.compare ? (
+            <code>{status.compare.labels[1]}</code>
+          ) : (
+            <span className="muted">not set (add [compare] to the config file)</span>
+          )}
+        </dd>
       </dl>
 
       <h2>Config file</h2>
@@ -161,7 +180,7 @@ export default function Settings({ status, onChange }: { status: Status; onChang
         Open in Notepad
       </button>
 
-      {status.provider === "anthropic" ? (
+      {usesAnthropic && (
         <KeySection
           provider="anthropic"
           saved={status.has_anthropic_key}
@@ -169,12 +188,13 @@ export default function Settings({ status, onChange }: { status: Status; onChang
           destination={anthropicDestination}
           onChange={onChange}
         />
-      ) : (
+      )}
+      {usesOpenAi && (
         <KeySection
           provider="openai_compatible"
           saved={status.has_openai_key}
           optional
-          destination={status.base_url ?? "the configured endpoint"}
+          destination={openAiDestination}
           onChange={onChange}
         />
       )}

@@ -773,3 +773,59 @@ kbd {
   white-space: normal;
 }
 
+
+/* Compare mode */
+
+.toggle {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.toggle.on {
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.lane {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lane-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lane-body {
+  padding: 0.45rem 0.5rem;
+  font-size: 13px;
+}
+
+.lane-actions {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0 0.5rem 0.45rem;
+}

@@ -140,3 +140,63 @@ export const QUICK_ACTIONS: { label: string; prompt: string }[] = [
   { label: "Fix", prompt: "Find what's wrong here and give the fix." },
   { label: "Rewrite", prompt: "Rewrite this to be clearer. Reply with only the rewritten text." },
 ];
+
+// Compare mode: one question answered by two models side by side.
+
+export interface Lane {
+  label: string;
+  text: string;
+  error?: string;
+  done: boolean;
+}
+
+export interface CompareState {
+  question: string;
+  context?: string;
+  lanes: [Lane, Lane];
+  busy: boolean;
+}
+
+export function startCompare(
+  question: string,
+  labels: [string, string],
+  context?: string,
+): CompareState {
+  const lane = (label: string): Lane => ({ label, text: "", done: false });
+  return { question, context, lanes: [lane(labels[0]), lane(labels[1])], busy: true };
+}
+
+/** Marks every lane finished, e.g. after a cancel or the final event. */
+export function finishCompare(s: CompareState): CompareState {
+  return {
+    ...s,
+    busy: false,
+    lanes: s.lanes.map((l) => ({ ...l, done: true })) as [Lane, Lane],
+  };
+}
+
+export function compareReducer(
+  s: CompareState,
+  msg: { lane: 0 | 1 | null; event: UiEvent },
+): CompareState {
+  if (msg.lane === null) {
+    return msg.event.type === "turn_ended" ? finishCompare(s) : s;
+  }
+  const lanes = [...s.lanes] as [Lane, Lane];
+  const lane = lanes[msg.lane];
+  const e = msg.event;
+  switch (e.type) {
+    case "text_delta":
+      lanes[msg.lane] = { ...lane, text: lane.text + e.text };
+      break;
+    case "turn_complete":
+      lanes[msg.lane] = { ...lane, done: true };
+      break;
+    case "turn_failed":
+      lanes[msg.lane] = { ...lane, error: e.error, done: true };
+      break;
+    default:
+      return s;
+  }
+  return { ...s, lanes };
+}

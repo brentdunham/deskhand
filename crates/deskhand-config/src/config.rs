@@ -51,6 +51,22 @@ max_tokens = 4096
 # for your profile folder, e.g. roots = ["~/Projects", "D:/Archive"]
 [search]
 roots = []
+
+# Compare mode sends the same question and context to a second model and
+# shows both answers side by side. Tools are not used in compare mode.
+# Uncomment and adjust, for example for OpenAI (key goes in Settings):
+#
+# [compare]
+# kind = "openai_compatible"
+# base_url = "https://api.openai.com/v1"
+# model = "<an OpenAI model name>"
+#
+# or for a local model through Ollama (no key needed):
+#
+# [compare]
+# kind = "openai_compatible"
+# base_url = "http://localhost:11434/v1"
+# model = "qwen3"
 "#;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -63,6 +79,9 @@ pub struct Config {
     /// (a plugin may register them later) and reported as warnings.
     pub tools: BTreeMap<String, Override>,
     pub search: SearchConfig,
+    /// A second model for compare mode. None disables compare.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compare: Option<ProviderConfig>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,6 +100,7 @@ impl Default for Config {
             provider: ProviderConfig::default(),
             tools: BTreeMap::new(),
             search: SearchConfig::default(),
+            compare: None,
         }
     }
 }
@@ -209,6 +229,11 @@ impl Config {
         let config: Config = toml::from_str(text)
             .map_err(|e| ConfigError::Invalid(e.to_string().trim().to_owned()))?;
         config.provider.validate().map_err(ConfigError::Invalid)?;
+        if let Some(compare) = &config.compare {
+            compare.validate().map_err(|e| {
+                ConfigError::Invalid(format!("[compare] {}", e.replace("provider.", "")))
+            })?;
+        }
         Ok(config)
     }
 
@@ -319,6 +344,19 @@ mod tests {
                 "`{text}` gave `{err}`, expected `{needle}`"
             );
         }
+    }
+
+    #[test]
+    fn parses_and_validates_compare() {
+        let c = Config::parse(
+            "[compare]\nkind = \"openai_compatible\"\nbase_url = \"http://localhost:11434/v1\"\nmodel = \"qwen3\"",
+        )
+        .unwrap();
+        assert_eq!(c.compare.unwrap().model(), "qwen3");
+        let err = Config::parse("[compare]\nkind = \"anthropic\"\nmodel = \"\"")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("[compare] model is empty"), "{err}");
     }
 
     #[test]

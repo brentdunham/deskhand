@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   AGENT_EVENT,
+  COMPARE_EVENT,
   CONFIG_EVENT,
   CONFIRM_EVENT,
   CONTEXT_EVENT,
+  type CompareMessage,
   type ContextInclude,
   type ContextView,
   MODE_EVENT,
@@ -18,7 +20,16 @@ import Chat from "./components/Chat";
 import CommandBar from "./components/CommandBar";
 import ConfirmDialog from "./components/ConfirmDialog";
 import Settings, { Onboarding } from "./components/Settings";
-import { ALL_PARTS, EMPTY, attachedLabel, reducer } from "./conversation";
+import {
+  ALL_PARTS,
+  type CompareState,
+  EMPTY,
+  attachedLabel,
+  compareReducer,
+  finishCompare,
+  reducer,
+  startCompare,
+} from "./conversation";
 
 type Tab = "chat" | "activity" | "settings";
 
@@ -45,6 +56,7 @@ export default function App() {
   const [barStart, setBarStart] = useState(0);
   // The next question starts a new model conversation (set on each capture).
   const freshRef = useRef(true);
+  const [compare, setCompare] = useState<CompareState | null>(null);
 
   const refresh = useCallback(() => {
     api
@@ -65,6 +77,7 @@ export default function App() {
         if (!convRef.current.busy) {
           freshRef.current = true;
           setBarStart(convRef.current.items.length);
+          setCompare((c) => (c?.busy ? c : null));
         }
       }
     });
@@ -76,7 +89,12 @@ export default function App() {
   useTauriEvent<UiEvent>(AGENT_EVENT, (event) => {
     dispatch({ type: "event", event });
     if (event.type === "tool_finished") setLogVersion((v) => v + 1);
+    // Cancel ends a comparison too.
+    if (event.type === "turn_cancelled") setCompare((c) => (c?.busy ? finishCompare(c) : c));
   });
+  useTauriEvent<CompareMessage>(COMPARE_EVENT, (msg) =>
+    setCompare((c) => (c ? compareReducer(c, msg) : c)),
+  );
   useTauriEvent<null>(CONFIG_EVENT, refresh);
   useTauriEvent<null>(CONTEXT_EVENT, loadContext);
   useTauriEvent<boolean>(MODE_EVENT, setExpanded);
@@ -90,6 +108,7 @@ export default function App() {
   }, [status?.needs_key]);
 
   const send = async (text: string) => {
+    setCompare(null);
     const label = attachedLabel(ctx, include);
     const inc = ctx ? include : null;
     if (freshRef.current && convRef.current.items.length > 0) {
@@ -106,6 +125,23 @@ export default function App() {
     api
       .sendMessage(text, inc)
       .catch((e) => dispatch({ type: "send_failed", error: errorText(e) }));
+  };
+
+  const sendCompare = (text: string) => {
+    const labels = status?.compare?.labels;
+    if (!labels) return;
+    const inc = ctx ? include : null;
+    // The bar shows the comparison instead of the previous exchange.
+    setBarStart(convRef.current.items.length);
+    setCompare(startCompare(text, labels, attachedLabel(ctx, include)));
+    api.compareMessage(text, inc).catch((e) =>
+      setCompare((c) => {
+        if (!c) return c;
+        const done = finishCompare(c);
+        done.lanes[0] = { ...done.lanes[0], error: errorText(e) };
+        return done;
+      }),
+    );
   };
 
   const newConversation = () => {
@@ -133,13 +169,16 @@ export default function App() {
       <>
         <CommandBar
           items={conv.items.slice(barStart).filter((i) => i.kind !== "divider")}
-          busy={conv.busy}
+          busy={conv.busy || !!compare?.busy}
           ctx={ctx}
           include={include}
           onInclude={setInclude}
           onDismissContext={() => void api.dismissContext()}
           onSend={(t) => void send(t)}
           onExpand={() => void api.setPanelMode(true)}
+          compare={compare}
+          compareAvailable={!!status.compare}
+          onCompare={sendCompare}
         />
         {/* Same position in both modes, so a pending confirmation survives
             the switch to the expanded view. */}

@@ -125,6 +125,9 @@ pub struct AgentConfig {
     pub system_prompt: String,
     /// Model round trips per user turn.
     pub max_steps: usize,
+    /// Offer the toolbox's tools to the model. When false the model can only
+    /// answer in text (compare mode).
+    pub tools: bool,
 }
 
 impl Default for AgentConfig {
@@ -132,6 +135,7 @@ impl Default for AgentConfig {
         Self {
             system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
             max_steps: 16,
+            tools: true,
         }
     }
 }
@@ -205,7 +209,11 @@ impl<P: Provider> Agent<P> {
             let request = ChatRequest {
                 system: self.config.system_prompt.clone(),
                 messages: session.messages.clone(),
-                tools: self.toolbox().definitions(),
+                tools: if self.config.tools {
+                    self.toolbox().definitions()
+                } else {
+                    Vec::new()
+                },
             };
 
             let mut text = String::new();
@@ -759,6 +767,23 @@ mod tests {
             .unwrap();
         assert_eq!(session.messages()[0].content.len(), 1);
         assert!(!session.taint().is_tainted());
+    }
+
+    #[tokio::test]
+    async fn tools_can_be_disabled() {
+        let agent = Agent::new(
+            Scripted::new(vec![vec![done(StopReason::EndTurn)]]),
+            toolbox(),
+            AgentConfig {
+                tools: false,
+                ..AgentConfig::default()
+            },
+        );
+        agent
+            .run_turn(&mut Session::new(), "hi", &Host::default())
+            .await
+            .unwrap();
+        assert!(agent.provider.requests.lock().unwrap()[0].tools.is_empty());
     }
 
     #[test]

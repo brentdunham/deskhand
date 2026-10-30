@@ -28,6 +28,12 @@ export interface Status {
   config_path: string;
   config_error: string | null;
   config_warnings: string[];
+  /** Present when a [compare] model is configured. */
+  compare: {
+    labels: [string, string];
+    base_url: string | null;
+    kind: Provider;
+  } | null;
 }
 
 export type UiEvent =
@@ -79,6 +85,13 @@ export const CONFIRM_EVENT = "confirm-request";
 export const CONFIG_EVENT = "config-changed";
 export const CONTEXT_EVENT = "context-changed";
 export const MODE_EVENT = "panel-mode";
+export const COMPARE_EVENT = "compare-event";
+
+/** Lane 0 is the primary model, 1 the compare model; null ends the comparison. */
+export interface CompareMessage {
+  lane: 0 | 1 | null;
+  event: UiEvent;
+}
 
 export interface ContextPreview {
   chars: number;
@@ -111,6 +124,8 @@ export const api = {
   openConfig: () => invoke<void>("open_config"),
   sendMessage: (text: string, include: ContextInclude | null) =>
     invoke<void>("send_message", { text, include }),
+  compareMessage: (text: string, include: ContextInclude | null) =>
+    invoke<void>("compare_message", { text, include }),
   context: () => invoke<ContextView | null>("context"),
   dismissContext: () => invoke<void>("dismiss_context"),
   setPanelMode: (expanded: boolean) => invoke<void>("set_panel_mode", { expanded }),

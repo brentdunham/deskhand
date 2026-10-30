@@ -23,7 +23,7 @@ deskhand-tools.workspace = true
 deskhand-win.workspace = true
 tauri-plugin-global-shortcut = "2"
 keyring = { version = "3", features = ["windows-native"] }
-tokio = { version = "1.54.1", features = ["sync"] }
+tokio = { version = "1.54.1", features = ["sync", "macros"] }
 
 # Does not inherit `unsafe_code = "forbid"`: Tauri macro expansions are outside
 # our control. Application code here should still contain no unsafe blocks.

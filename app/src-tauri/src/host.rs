@@ -166,3 +166,36 @@ impl AgentHost for TauriHost {
         answer.await.unwrap_or(false)
     }
 }
+
+pub const COMPARE_EVENT: &str = "compare-event";
+
+/// A compare-mode event. `lane` is 0 for the primary model and 1 for the
+/// compare model; `None` marks the end of the whole comparison.
+#[derive(Debug, Clone, Serialize)]
+pub struct CompareMessage {
+    pub lane: Option<u8>,
+    pub event: UiEvent,
+}
+
+/// Host for one side of a comparison. Compare runs offer no tools, so
+/// confirmation is never requested; if it were, it would be declined.
+pub struct CompareHost {
+    pub app: AppHandle,
+    pub lane: u8,
+}
+
+impl AgentHost for CompareHost {
+    fn on_event(&self, event: AgentEvent) {
+        let _ = self.app.emit(
+            COMPARE_EVENT,
+            CompareMessage {
+                lane: Some(self.lane),
+                event: UiEvent::from(event),
+            },
+        );
+    }
+
+    async fn confirm(&self, _request: ConfirmationRequest) -> bool {
+        false
+    }
+}
