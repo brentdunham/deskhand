@@ -1,8 +1,32 @@
 import { useEffect, useReducer, useRef, useState, type KeyboardEvent } from "react";
-import { AGENT_EVENT, api, compact, errorText, useTauriEvent, type UiEvent } from "../api";
+import {
+  AGENT_EVENT,
+  CONTEXT_EVENT,
+  type ContextInclude,
+  type ContextView,
+  api,
+  compact,
+  errorText,
+  useTauriEvent,
+  type UiEvent,
+} from "../api";
+import ContextBar from "./ContextBar";
+
+const ALL_PARTS: ContextInclude = { selection: true, window_text: true, screenshot: true };
+
+/** Short description of what is attached, shown under the sent message. */
+function attachedLabel(ctx: ContextView | null, inc: ContextInclude): string | undefined {
+  if (!ctx) return undefined;
+  const parts = [
+    ctx.selection && inc.selection && "selection",
+    ctx.window_text && inc.window_text && "window text",
+    ctx.screenshot && inc.screenshot && "screenshot",
+  ].filter(Boolean);
+  return parts.length ? `with ${parts.join(", ")} from ${ctx.app ?? ctx.window}` : undefined;
+}
 
 type Item =
-  | { id: number; kind: "user"; text: string }
+  | { id: number; kind: "user"; text: string; context?: string }
   | { id: number; kind: "assistant"; text: string }
   | {
       id: number;
@@ -25,7 +49,7 @@ interface State {
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 type Action =
-  | { type: "send"; text: string }
+  | { type: "send"; text: string; context?: string }
   | { type: "event"; event: UiEvent }
   | { type: "send_failed"; error: string }
   | { type: "clear" };
@@ -39,7 +63,7 @@ function reducer(s: State, a: Action): State {
 
   switch (a.type) {
     case "send":
-      return { ...push({ kind: "user", text: a.text }), busy: true };
+      return { ...push({ kind: "user", text: a.text, context: a.context }), busy: true };
     case "send_failed":
       return { ...push({ kind: "notice", text: a.error, error: true }), busy: false };
     case "clear":
@@ -98,10 +122,26 @@ function reducer(s: State, a: Action): State {
 export default function Chat() {
   const [state, dispatch] = useReducer(reducer, { items: [], busy: false, nextId: 0 });
   const [draft, setDraft] = useState("");
+  const [ctx, setCtx] = useState<ContextView | null>(null);
+  const [include, setInclude] = useState<ContextInclude>(ALL_PARTS);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useTauriEvent<UiEvent>(AGENT_EVENT, (event) => dispatch({ type: "event", event }));
+
+  const loadContext = () =>
+    api.context().then((v) => {
+      setCtx(v);
+      // A fresh capture starts with every part attached.
+      if (v?.capturing) setInclude(ALL_PARTS);
+      if (v) inputRef.current?.focus();
+    });
+  useTauriEvent<null>(CONTEXT_EVENT, () => void loadContext());
+  useEffect(() => {
+    void loadContext();
+    // Load once on mount; later changes arrive as events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -115,8 +155,10 @@ export default function Chat() {
     const text = draft.trim();
     if (!text || state.busy) return;
     setDraft("");
-    dispatch({ type: "send", text });
-    api.sendMessage(text).catch((e) => dispatch({ type: "send_failed", error: errorText(e) }));
+    dispatch({ type: "send", text, context: attachedLabel(ctx, include) });
+    api
+      .sendMessage(text, ctx ? include : null)
+      .catch((e) => dispatch({ type: "send_failed", error: errorText(e) }));
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -146,9 +188,10 @@ export default function Chat() {
           switch (it.kind) {
             case "user":
               return (
-                <p key={it.id} className="msg msg-user">
-                  {it.text}
-                </p>
+                <div key={it.id} className="msg-user-wrap">
+                  <p className="msg msg-user">{it.text}</p>
+                  {it.context && <p className="msg-context">{it.context}</p>}
+                </div>
               );
             case "assistant":
               return (
@@ -176,12 +219,22 @@ export default function Chat() {
       </div>
 
       <div className="composer">
+        {ctx && (
+          <ContextBar
+            ctx={ctx}
+            include={include}
+            onInclude={setInclude}
+            onDismiss={() => void api.dismissContext()}
+          />
+        )}
         <textarea
           ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={state.busy ? "Working…" : "Ask DeskHand"}
+          placeholder={
+            state.busy ? "Working…" : ctx ? `Ask about ${ctx.app ?? "this window"}` : "Ask DeskHand"
+          }
           rows={2}
           disabled={state.busy}
           aria-label="Message"

@@ -77,13 +77,41 @@ export interface ActionEntry {
 export const AGENT_EVENT = "agent-event";
 export const CONFIRM_EVENT = "confirm-request";
 export const CONFIG_EVENT = "config-changed";
+export const CONTEXT_EVENT = "context-changed";
+
+export interface ContextPreview {
+  chars: number;
+  preview: string;
+  truncated: boolean;
+}
+
+/** What was captured on the last hotkey press. Mirrors context.rs. */
+export interface ContextView {
+  window: string;
+  app: string | null;
+  selection: ContextPreview | null;
+  window_text: ContextPreview | null;
+  screenshot: { data_url: string; width: number; height: number } | null;
+  screenshot_note: string | null;
+  capturing: boolean;
+}
+
+/** Which captured parts to send with the next message. */
+export interface ContextInclude {
+  selection: boolean;
+  window_text: boolean;
+  screenshot: boolean;
+}
 
 export const api = {
   status: () => invoke<Status>("status"),
   setApiKey: (provider: Provider, key: string) => invoke<void>("set_api_key", { provider, key }),
   clearApiKey: (provider: Provider) => invoke<void>("clear_api_key", { provider }),
   openConfig: () => invoke<void>("open_config"),
-  sendMessage: (text: string) => invoke<void>("send_message", { text }),
+  sendMessage: (text: string, include: ContextInclude | null) =>
+    invoke<void>("send_message", { text, include }),
+  context: () => invoke<ContextView | null>("context"),
+  dismissContext: () => invoke<void>("dismiss_context"),
   cancelTurn: () => invoke<void>("cancel_turn"),
   answerConfirmation: (id: number, approved: boolean) =>
     invoke<boolean>("answer_confirmation", { id, approved }),

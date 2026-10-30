@@ -14,7 +14,8 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::host::{AGENT_EVENT, TauriHost, UiEvent};
 use crate::secrets::{self, KeySlot};
-use crate::{AppState, lock};
+use crate::{AppState, context, lock};
+use deskhand_agent::ScreenContext;
 
 #[derive(Debug, Serialize)]
 pub struct Status {
@@ -108,6 +109,7 @@ fn spawn_turn<P: Provider + 'static>(
     state: &AppState,
     provider: P,
     text: String,
+    context: Option<ScreenContext>,
 ) -> JoinHandle<()> {
     let agent = Agent::new(provider, state.toolbox.clone(), AgentConfig::default());
     let host = TauriHost {
@@ -118,7 +120,10 @@ fn spawn_turn<P: Provider + 'static>(
     let busy = state.busy.clone();
     tauri::async_runtime::spawn(async move {
         let mut session = session.lock().await;
-        if let Err(e) = agent.run_turn(&mut session, &text, &host).await {
+        if let Err(e) = agent
+            .run_turn_with_context(&mut session, &text, context, &host)
+            .await
+        {
             let _ = app.emit(
                 AGENT_EVENT,
                 UiEvent::TurnFailed {
@@ -133,7 +138,12 @@ fn spawn_turn<P: Provider + 'static>(
 }
 
 /// Builds the configured provider and starts the turn.
-fn start_turn(app: AppHandle, state: &AppState, text: String) -> Result<JoinHandle<()>, String> {
+fn start_turn(
+    app: AppHandle,
+    state: &AppState,
+    text: String,
+    context: Option<ScreenContext>,
+) -> Result<JoinHandle<()>, String> {
     let provider = state
         .config
         .read()
@@ -154,7 +164,13 @@ fn start_turn(app: AppHandle, state: &AppState, text: String) -> Result<JoinHand
             if let Some(url) = base_url {
                 config.base_url = url;
             }
-            spawn_turn(app, state, Anthropic::new(state.http.clone(), config), text)
+            spawn_turn(
+                app,
+                state,
+                Anthropic::new(state.http.clone(), config),
+                text,
+                context,
+            )
         }
         ProviderConfig::OpenaiCompatible {
             base_url,
@@ -169,6 +185,7 @@ fn start_turn(app: AppHandle, state: &AppState, text: String) -> Result<JoinHand
                 state,
                 OpenAiCompatible::new(state.http.clone(), config),
                 text,
+                context,
             )
         }
     })
@@ -181,6 +198,7 @@ pub fn send_message(
     app: AppHandle,
     state: State<'_, AppState>,
     text: String,
+    include: Option<context::Include>,
 ) -> Result<(), String> {
     let text = text.trim().to_owned();
     if text.is_empty() {
@@ -189,7 +207,8 @@ pub fn send_message(
     if state.busy.swap(true, Ordering::SeqCst) {
         return Err("DeskHand is still working on the previous request.".into());
     }
-    match start_turn(app, &state, text) {
+    let context = context::take(&app, &state, include);
+    match start_turn(app, &state, text, context) {
         Ok(handle) => {
             *lock(&state.turn) = Some(handle);
             Ok(())

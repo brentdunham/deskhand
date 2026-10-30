@@ -159,8 +159,29 @@ fn message_json(m: &Message) -> Vec<Value> {
                     _ => None,
                 })
                 .collect();
-            if !text.is_empty() {
-                out.push(json!({ "role": "user", "content": text }));
+            let images: Vec<Value> = m
+                .content
+                .iter()
+                .filter_map(|b| match b {
+                    Block::Image(img) => Some(json!({
+                        "type": "image_url",
+                        "image_url": { "url": format!("data:{};base64,{}", img.media_type, img.base64) },
+                    })),
+                    _ => None,
+                })
+                .collect();
+            if images.is_empty() {
+                if !text.is_empty() {
+                    out.push(json!({ "role": "user", "content": text }));
+                }
+            } else {
+                // Images require the content-parts form of a user message.
+                let mut parts = Vec::new();
+                if !text.is_empty() {
+                    parts.push(json!({ "type": "text", "text": text }));
+                }
+                parts.extend(images);
+                out.push(json!({ "role": "user", "content": parts }));
             }
             out
         }
@@ -366,6 +387,30 @@ data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"function\":{\"name\":\"list_w
         assert!(matches!(decode_all(raw), Err(ProviderError::Api { .. })));
         let raw = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n";
         assert!(matches!(decode_all(raw), Err(ProviderError::Protocol(_))));
+    }
+
+    #[test]
+    fn images_use_content_parts_with_data_urls() {
+        let config = OpenAiConfig::new(OLLAMA_BASE_URL, "llava");
+        let request = ChatRequest {
+            system: "sys".into(),
+            messages: vec![Message {
+                role: Role::User,
+                content: vec![
+                    Block::Text("describe".into()),
+                    Block::Image(crate::message::ImageData {
+                        media_type: "image/png".into(),
+                        base64: "iVBOR".into(),
+                    }),
+                ],
+            }],
+            tools: vec![],
+        };
+        let body = request_body(&config, &request);
+        let parts = &body["messages"][1]["content"];
+        assert_eq!(parts[0]["type"], "text");
+        assert_eq!(parts[1]["type"], "image_url");
+        assert_eq!(parts[1]["image_url"]["url"], "data:image/png;base64,iVBOR");
     }
 
     #[test]

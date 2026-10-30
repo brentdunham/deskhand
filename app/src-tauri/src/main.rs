@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod context;
 mod host;
 mod secrets;
 
@@ -48,6 +49,9 @@ pub struct AppState {
     active_hotkey: Mutex<Option<Shortcut>>,
     pub hotkey_registered: AtomicBool,
     watcher: Mutex<Option<Watcher>>,
+    /// What the user was looking at on the last hotkey press.
+    pub pending_context: Mutex<Option<context::PendingContext>>,
+    pub capture_seq: std::sync::atomic::AtomicU64,
 }
 
 /// Poison only means a panic elsewhere; the data is still usable.
@@ -61,6 +65,21 @@ pub(crate) fn show_panel(app: &AppHandle) {
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+}
+
+/// The hotkey hides the panel when it has focus. Otherwise it captures what
+/// the user is looking at, then shows the panel: capture must come first,
+/// because showing the panel moves focus to DeskHand.
+fn on_hotkey(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main")
+        && w.is_visible().unwrap_or(false)
+        && w.is_focused().unwrap_or(false)
+    {
+        let _ = w.hide();
+        return;
+    }
+    context::capture_foreground(app);
+    show_panel(app);
 }
 
 fn toggle_panel(app: &AppHandle) {
@@ -214,6 +233,8 @@ fn main() {
         active_hotkey: Mutex::new(None),
         hotkey_registered: AtomicBool::new(false),
         watcher: Mutex::new(None),
+        pending_context: Mutex::new(None),
+        capture_seq: std::sync::atomic::AtomicU64::new(0),
     };
 
     tauri::Builder::default()
@@ -222,7 +243,7 @@ fn main() {
                 // Only DeskHand's one hotkey is ever registered.
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        toggle_panel(app);
+                        on_hotkey(app);
                     }
                 })
                 .build(),
@@ -294,6 +315,8 @@ fn main() {
             commands::action_log,
             commands::undo_action,
             commands::new_conversation,
+            context::context,
+            context::dismiss_context,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start DeskHand");

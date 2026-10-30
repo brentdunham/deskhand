@@ -611,6 +611,8 @@ dependencies = [
 name = "deskhand-win"
 version = "0.1.0-rc.1"
 dependencies = [
+ "base64 0.23.1",
+ "png 0.18.1",
  "serde",
  "windows 0.62.2",
 ]

@@ -334,3 +334,62 @@ fn role_label(t: UIA_CONTROLTYPE_ID) -> Option<&'static str> {
         .find(|(id, _)| *id == t)
         .map(|(_, label)| *label)
 }
+
+/// The text selected in whatever element has keyboard focus, when that
+/// element exposes a selection through the Text pattern (browsers, most
+/// editors, Windows Terminal).
+///
+/// Call before DeskHand's panel takes focus. Password fields are never read.
+/// Best effort: anything that fails or exceeds `timeout` yields `None`, so a
+/// slow app never delays the panel by more than `timeout`.
+pub fn read_focused_selection(max_chars: usize, timeout: Duration) -> Option<String> {
+    let (tx, rx) = mpsc::channel();
+    thread::Builder::new()
+        .name("deskhand-uia-selection".into())
+        .spawn(move || {
+            let _serial = READ_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+            let _ = tx.send(selection_on_this_thread(max_chars));
+        })
+        .ok()?;
+    rx.recv_timeout(timeout).ok().flatten()
+}
+
+fn selection_on_this_thread(max_chars: usize) -> Option<String> {
+    let _apartment = ComApartment::init().ok()?;
+    let max = i32::try_from(max_chars).unwrap_or(i32::MAX);
+    // SAFETY: COM is initialized on this thread for the apartment guard's
+    // lifetime; every call is on valid interface pointers created here, and
+    // failures surface as errors mapped to `None`.
+    unsafe {
+        let automation: IUIAutomation =
+            CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()?;
+        if let Ok(a2) = automation.cast::<IUIAutomation2>() {
+            let _ = a2.SetConnectionTimeout(1_000);
+            let _ = a2.SetTransactionTimeout(1_000);
+        }
+        let focused = automation.GetFocusedElement().ok()?;
+        // Unknown counts as a password field.
+        if focused
+            .CurrentIsPassword()
+            .map(|b| b.as_bool())
+            .unwrap_or(true)
+        {
+            return None;
+        }
+        let pattern = focused
+            .GetCurrentPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId)
+            .ok()?;
+        let ranges = pattern.GetSelection().ok()?;
+        let mut parts = Vec::new();
+        for i in 0..ranges.Length().ok()? {
+            if let Ok(text) = ranges.GetElement(i).and_then(|r| r.GetText(max)) {
+                let text = text.to_string();
+                if !text.trim().is_empty() {
+                    parts.push(text);
+                }
+            }
+        }
+        let joined = parts.join("\n");
+        (!joined.is_empty()).then(|| joined.chars().take(max_chars).collect())
+    }
+}

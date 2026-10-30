@@ -93,6 +93,10 @@ fn message_json(m: &Message) -> Value {
         .iter()
         .map(|b| match b {
             Block::Text(t) => json!({ "type": "text", "text": t }),
+            Block::Image(img) => json!({
+                "type": "image",
+                "source": { "type": "base64", "media_type": img.media_type, "data": img.base64 },
+            }),
             Block::ToolUse(c) => {
                 json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.input })
             }
@@ -385,6 +389,32 @@ data: {\"type\":\"message_stop\"}
         assert!(body.get("tools").is_none());
         assert_eq!(body["messages"][1]["content"][0]["type"], "tool_use");
         assert_eq!(body["messages"][2]["content"][0]["tool_use_id"], "t1");
+    }
+
+    #[test]
+    fn maps_images_to_base64_sources() {
+        let body = request_body(
+            &AnthropicConfig::new("k"),
+            &ChatRequest {
+                system: String::new(),
+                messages: vec![Message {
+                    role: Role::User,
+                    content: vec![
+                        Block::Text("what is this".into()),
+                        Block::Image(crate::message::ImageData {
+                            media_type: "image/png".into(),
+                            base64: "iVBOR".into(),
+                        }),
+                    ],
+                }],
+                tools: vec![],
+            },
+        );
+        let image = &body["messages"][0]["content"][1];
+        assert_eq!(image["type"], "image");
+        assert_eq!(image["source"]["type"], "base64");
+        assert_eq!(image["source"]["media_type"], "image/png");
+        assert_eq!(image["source"]["data"], "iVBOR");
     }
 
     #[test]

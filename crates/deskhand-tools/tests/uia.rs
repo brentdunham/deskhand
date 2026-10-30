@@ -4,6 +4,7 @@
 use std::time::Duration;
 
 use deskhand_win::WinError;
+use deskhand_win::capture::capture_window;
 use deskhand_win::test_support::TestTextWindow;
 use deskhand_win::uia::{TextLimits, read_text};
 use deskhand_win::window::WindowId;
@@ -38,6 +39,18 @@ fn respects_the_character_limit() {
     let text = read_text(window.id(), limits).unwrap();
     assert!(text.text.len() <= 1_000, "{} chars", text.text.len());
     assert!(text.truncated);
+}
+
+#[test]
+fn captures_a_window_as_a_bounded_png() {
+    let window = TestTextWindow::spawn("capture me", "pw").unwrap();
+    let shot = capture_window(window.id(), 256)
+        .unwrap()
+        .expect("edit controls render non-black pixels");
+    assert_eq!(&shot.png[..8], b"\x89PNG\r\n\x1a\n");
+    assert!(shot.width <= 256 && shot.height <= 256);
+    assert!(shot.width > 0 && shot.height > 0);
+    assert!(!shot.base64().is_empty());
 }
 
 #[test]

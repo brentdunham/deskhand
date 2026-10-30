@@ -12,7 +12,10 @@
 //! [`geometry`] is platform-independent so its math can be tested anywhere.
 
 pub mod geometry;
+pub mod image;
 
+#[cfg(windows)]
+pub mod capture;
 #[cfg(windows)]
 pub mod clipboard;
 #[cfg(windows)]

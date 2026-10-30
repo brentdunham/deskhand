@@ -13,9 +13,11 @@ mod sse;
 
 pub use agent::{
     Agent, AgentConfig, AgentError, AgentEvent, AgentHost, ConfirmationRequest,
-    DEFAULT_SYSTEM_PROMPT, Session,
+    DEFAULT_SYSTEM_PROMPT, ScreenContext, Session,
 };
-pub use message::{Block, ChatRequest, Message, Role, StopReason, StreamEvent, ToolCall, Usage};
+pub use message::{
+    Block, ChatRequest, ImageData, Message, Role, StopReason, StreamEvent, ToolCall, Usage,
+};
 pub use provider::{EventStream, Provider, ProviderError};
 
 /// The HTTP client type provider adapters take.

@@ -85,6 +85,14 @@ pub fn list_windows() -> Result<Vec<WindowInfo>> {
         .collect())
 }
 
+/// The window that has keyboard focus right now, if any. Read this before
+/// showing DeskHand's own panel, which takes the foreground.
+pub fn foreground() -> Option<WindowId> {
+    // SAFETY: no memory preconditions.
+    let h = unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
+    (!h.is_invalid()).then(|| WindowId::from_hwnd(h))
+}
+
 pub fn window(id: WindowId) -> Result<WindowInfo> {
     info_for(live(id)?)
 }
@@ -296,7 +304,7 @@ fn apply_frame(h: HWND, frame: Rect) -> Result<()> {
     .ctx("SetWindowPos")
 }
 
-fn window_rect(h: HWND) -> Result<Rect> {
+pub(crate) fn window_rect(h: HWND) -> Result<Rect> {
     let mut r = RECT::default();
     // SAFETY: `r` is a valid out pointer.
     unsafe { GetWindowRect(h, &mut r) }.ctx("GetWindowRect")?;
@@ -304,7 +312,7 @@ fn window_rect(h: HWND) -> Result<Rect> {
 }
 
 /// The visible frame, falling back to the window rect if DWM has no answer.
-fn frame_rect(h: HWND) -> Result<Rect> {
+pub(crate) fn frame_rect(h: HWND) -> Result<Rect> {
     let mut r = RECT::default();
     // SAFETY: the pointer and size describe `r`, a RECT, which is the type
     // DWMWA_EXTENDED_FRAME_BOUNDS writes.

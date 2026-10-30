@@ -27,6 +27,8 @@ impl Message {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
     Text(String),
+    /// Only in user messages.
+    Image(ImageData),
     ToolUse(ToolCall),
     ToolResult {
         tool_use_id: String,
@@ -40,6 +42,25 @@ pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub input: Value,
+}
+
+/// An image sent to the model.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ImageData {
+    /// e.g. `image/png`.
+    pub media_type: String,
+    /// Base64 without a `data:` prefix.
+    pub base64: String,
+}
+
+// Base64 payloads are large; keep them out of debug output.
+impl std::fmt::Debug for ImageData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ImageData")
+            .field("media_type", &self.media_type)
+            .field("base64_len", &self.base64.len())
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
