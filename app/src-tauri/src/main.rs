@@ -4,6 +4,7 @@
 mod commands;
 mod context;
 mod host;
+mod panel;
 mod secrets;
 
 use std::path::PathBuf;
@@ -52,6 +53,10 @@ pub struct AppState {
     /// What the user was looking at on the last hotkey press.
     pub pending_context: Mutex<Option<context::PendingContext>>,
     pub capture_seq: std::sync::atomic::AtomicU64,
+    /// The window the last hotkey press came from; paste-back goes here.
+    pub last_target: Mutex<Option<deskhand_win::window::WindowId>>,
+    /// Expanded view (chat, activity, settings) rather than the command bar.
+    pub expanded: AtomicBool,
 }
 
 /// Poison only means a panic elsewhere; the data is still usable.
@@ -235,6 +240,8 @@ fn main() {
         watcher: Mutex::new(None),
         pending_context: Mutex::new(None),
         capture_seq: std::sync::atomic::AtomicU64::new(0),
+        last_target: Mutex::new(None),
+        expanded: AtomicBool::new(false),
     };
 
     tauri::Builder::default()
@@ -297,12 +304,19 @@ fn main() {
             build_tray(&handle)?;
             Ok(())
         })
-        // Closing the panel hides it; quit from the tray.
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
+        // Closing the panel hides it; quit from the tray. The command bar
+        // also hides when it loses focus, unless something is in progress.
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            WindowEvent::Focused(false)
+                if panel::should_hide_on_blur(&window.state::<AppState>()) =>
+            {
+                let _ = window.hide();
+            }
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::status,
@@ -317,6 +331,10 @@ fn main() {
             commands::new_conversation,
             context::context,
             context::dismiss_context,
+            panel::set_panel_mode,
+            panel::resize_panel,
+            panel::hide_panel,
+            panel::insert_text,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start DeskHand");

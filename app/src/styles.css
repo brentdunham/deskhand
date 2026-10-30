@@ -589,3 +589,187 @@ textarea {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Command bar */
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg);
+}
+
+.bar-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bar-grip {
+  cursor: move;
+  user-select: none;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-radius: 6px;
+  padding: 0.3rem 0.4rem;
+}
+
+.bar-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  padding: 0.3rem 0;
+  resize: none;
+  max-height: 6rem;
+}
+
+.bar-input:focus-visible {
+  outline: none;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 0.4rem;
+}
+
+.primary kbd {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.bar-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 460px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.bar-question {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bar-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.45rem;
+}
+
+.bar-notice {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.bar-pad {
+  margin: 0;
+}
+
+.divider {
+  margin: 0.25rem 0;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 0.35rem;
+}
+
+/* Markdown */
+
+.md {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.md p,
+.md ul,
+.md ol {
+  margin: 0;
+}
+
+.md ul,
+.md ol {
+  padding-left: 1.3rem;
+}
+
+.md-heading {
+  font-weight: 600;
+}
+
+.md code {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.25rem;
+}
+
+.md-code {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.md-code-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 0.15rem 0.2rem 0.15rem 0.5rem;
+}
+
+.md-code-head button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 0.1rem 0.4rem;
+}
+
+.md-code pre {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  overflow-x: auto;
+  background: var(--bg);
+}
+
+.md-code pre code {
+  border: none;
+  background: transparent;
+  padding: 0;
+  white-space: pre;
+}
+
+.msg-assistant .md {
+  max-width: 100%;
+}
+
+.msg-assistant {
+  white-space: normal;
+}
+

@@ -46,6 +46,11 @@ impl Confirmations {
     pub fn cancel_all(&self) {
         self.pending().clear();
     }
+
+    /// No confirmation is waiting on the user.
+    pub fn is_empty(&self) -> bool {
+        self.pending().is_empty()
+    }
 }
 
 /// Agent events as the frontend receives them.

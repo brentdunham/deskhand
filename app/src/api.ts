@@ -78,6 +78,7 @@ export const AGENT_EVENT = "agent-event";
 export const CONFIRM_EVENT = "confirm-request";
 export const CONFIG_EVENT = "config-changed";
 export const CONTEXT_EVENT = "context-changed";
+export const MODE_EVENT = "panel-mode";
 
 export interface ContextPreview {
   chars: number;
@@ -112,6 +113,10 @@ export const api = {
     invoke<void>("send_message", { text, include }),
   context: () => invoke<ContextView | null>("context"),
   dismissContext: () => invoke<void>("dismiss_context"),
+  setPanelMode: (expanded: boolean) => invoke<void>("set_panel_mode", { expanded }),
+  resizePanel: (height: number) => invoke<void>("resize_panel", { height }),
+  hidePanel: () => invoke<void>("hide_panel"),
+  insertText: (text: string) => invoke<void>("insert_text", { text }),
   cancelTurn: () => invoke<void>("cancel_turn"),
   answerConfirmation: (id: number, approved: boolean) =>
     invoke<boolean>("answer_confirmation", { id, approved }),

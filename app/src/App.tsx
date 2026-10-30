@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   AGENT_EVENT,
   CONFIG_EVENT,
-  api,
-  errorText,
+  CONFIRM_EVENT,
+  CONTEXT_EVENT,
+  type ContextInclude,
+  type ContextView,
+  MODE_EVENT,
   type Status,
   type UiEvent,
+  api,
+  errorText,
   useTauriEvent,
 } from "./api";
 import ActionLog from "./components/ActionLog";
 import Chat from "./components/Chat";
+import CommandBar from "./components/CommandBar";
 import ConfirmDialog from "./components/ConfirmDialog";
 import Settings, { Onboarding } from "./components/Settings";
+import { ALL_PARTS, EMPTY, attachedLabel, reducer } from "./conversation";
 
 type Tab = "chat" | "activity" | "settings";
 
@@ -26,6 +33,18 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("chat");
   const [logVersion, setLogVersion] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+
+  const [conv, dispatch] = useReducer(reducer, EMPTY);
+  const convRef = useRef(conv);
+  convRef.current = conv;
+
+  const [ctx, setCtx] = useState<ContextView | null>(null);
+  const [include, setInclude] = useState<ContextInclude>(ALL_PARTS);
+  // The command bar shows items from here on: just the current exchange.
+  const [barStart, setBarStart] = useState(0);
+  // The next question starts a new model conversation (set on each capture).
+  const freshRef = useRef(true);
 
   const refresh = useCallback(() => {
     api
@@ -37,12 +56,67 @@ export default function App() {
       .catch((e) => setError(errorText(e)));
   }, []);
 
-  useEffect(refresh, [refresh]);
+  const loadContext = useCallback(() => {
+    void api.context().then((v) => {
+      setCtx(v);
+      if (v?.capturing) {
+        // A new hotkey press: fresh question, every part attached.
+        setInclude(ALL_PARTS);
+        if (!convRef.current.busy) {
+          freshRef.current = true;
+          setBarStart(convRef.current.items.length);
+        }
+      }
+    });
+  }, []);
 
-  useTauriEvent<UiEvent>(AGENT_EVENT, (e) => {
-    if (e.type === "tool_finished") setLogVersion((v) => v + 1);
+  useEffect(refresh, [refresh]);
+  useEffect(loadContext, [loadContext]);
+
+  useTauriEvent<UiEvent>(AGENT_EVENT, (event) => {
+    dispatch({ type: "event", event });
+    if (event.type === "tool_finished") setLogVersion((v) => v + 1);
   });
   useTauriEvent<null>(CONFIG_EVENT, refresh);
+  useTauriEvent<null>(CONTEXT_EVENT, loadContext);
+  useTauriEvent<boolean>(MODE_EVENT, setExpanded);
+  // A confirmation needs room; the bar expands to show it.
+  useTauriEvent<unknown>(CONFIRM_EVENT, () => {
+    if (!expanded) void api.setPanelMode(true);
+  });
+
+  useEffect(() => {
+    if (status?.needs_key) void api.setPanelMode(true);
+  }, [status?.needs_key]);
+
+  const send = async (text: string) => {
+    const label = attachedLabel(ctx, include);
+    const inc = ctx ? include : null;
+    if (freshRef.current && convRef.current.items.length > 0) {
+      try {
+        await api.newConversation();
+      } catch {
+        // Busy elsewhere; continue the current conversation instead.
+      }
+      dispatch({ type: "divider" });
+      setBarStart(convRef.current.items.length + 1);
+    }
+    freshRef.current = false;
+    dispatch({ type: "send", text, context: label });
+    api
+      .sendMessage(text, inc)
+      .catch((e) => dispatch({ type: "send_failed", error: errorText(e) }));
+  };
+
+  const newConversation = () => {
+    api
+      .newConversation()
+      .then(() => {
+        dispatch({ type: "clear" });
+        setBarStart(0);
+      })
+      .catch((e) => dispatch({ type: "send_failed", error: errorText(e) }));
+  };
 
   if (error) {
     return (
@@ -54,10 +128,33 @@ export default function App() {
   if (!status) return <main className="onboarding muted">Starting…</main>;
   if (status.needs_key) return <Onboarding onSaved={refresh} />;
 
+  if (!expanded) {
+    return (
+      <>
+        <CommandBar
+          items={conv.items.slice(barStart).filter((i) => i.kind !== "divider")}
+          busy={conv.busy}
+          ctx={ctx}
+          include={include}
+          onInclude={setInclude}
+          onDismissContext={() => void api.dismissContext()}
+          onSend={(t) => void send(t)}
+          onExpand={() => void api.setPanelMode(true)}
+        />
+        {/* Same position in both modes, so a pending confirmation survives
+            the switch to the expanded view. */}
+        <ConfirmDialog />
+      </>
+    );
+  }
+
   return (
+    <>
     <div className="app">
-      <header className="topbar">
-        <span className="brand">DeskHand</span>
+      <header className="topbar" data-tauri-drag-region>
+        <span className="brand" data-tauri-drag-region>
+          DeskHand
+        </span>
         <nav className="tabs" aria-label="Views">
           {TABS.map((t) => (
             <button
@@ -70,6 +167,15 @@ export default function App() {
               {t.label}
             </button>
           ))}
+          <button
+            type="button"
+            className="icon"
+            title="Collapse to the command bar"
+            aria-label="Collapse"
+            onClick={() => void api.setPanelMode(false)}
+          >
+            ⤡
+          </button>
         </nav>
       </header>
 
@@ -91,9 +197,16 @@ export default function App() {
         </p>
       ))}
 
-      {/* Chat stays mounted so it keeps receiving events on other tabs. */}
       <div className="view" hidden={tab !== "chat"}>
-        <Chat />
+        <Chat
+          conversation={conv}
+          ctx={ctx}
+          include={include}
+          onInclude={setInclude}
+          onDismissContext={() => void api.dismissContext()}
+          onSend={(t) => void send(t)}
+          onNew={newConversation}
+        />
       </div>
       {tab === "activity" && (
         <div className="view">
@@ -105,8 +218,8 @@ export default function App() {
           <Settings status={status} onChange={refresh} />
         </div>
       )}
-
-      <ConfirmDialog />
     </div>
+    <ConfirmDialog />
+    </>
   );
 }

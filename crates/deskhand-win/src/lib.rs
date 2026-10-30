@@ -21,6 +21,8 @@ pub mod clipboard;
 #[cfg(windows)]
 mod error;
 #[cfg(windows)]
+pub mod input;
+#[cfg(windows)]
 pub mod monitor;
 #[cfg(windows)]
 pub mod shell;

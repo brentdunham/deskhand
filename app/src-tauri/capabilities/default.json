@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Baseline permissions for the main window. Add plugin permissions here explicitly; nothing is granted by default.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
 }

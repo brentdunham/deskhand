@@ -55,6 +55,12 @@ pub fn capture_foreground(app: &AppHandle) -> bool {
     let selection = uia::read_focused_selection(MAX_SELECTION_CHARS, SELECTION_TIMEOUT);
 
     let state = app.state::<AppState>();
+    // Paste-back goes to this window, and the bar opens on its monitor.
+    *lock(&state.last_target) = Some(info.id);
+    crate::panel::set_mode(app, false);
+    if let Ok(m) = deskhand_win::monitor::monitor(info.monitor) {
+        crate::panel::position_on(app, m.work_area);
+    }
     let seq = state.capture_seq.fetch_add(1, Ordering::SeqCst) + 1;
     *lock(&state.pending_context) = Some(PendingContext {
         seq,
