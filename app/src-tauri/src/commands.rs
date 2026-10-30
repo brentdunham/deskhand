@@ -52,9 +52,11 @@ fn build_provider(state: &AppState, config: &ProviderConfig) -> Result<AnyProvid
             base_url,
             model,
             max_tokens,
+            thinking,
         } => {
             let mut c = OpenAiConfig::new(base_url, model);
             c.max_tokens = max_tokens;
+            c.thinking = thinking;
             c.api_key = secrets::get(KeySlot::OpenaiCompatible)?;
             AnyProvider::OpenAi(OpenAiCompatible::new(state.http.clone(), c))
         }

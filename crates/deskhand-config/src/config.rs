@@ -38,6 +38,7 @@ max_tokens = 4096
 # base_url = "http://localhost:11434/v1"   # Ollama
 # model = "qwen3"
 # max_tokens = 4096
+# thinking = false   # Qwen3-family models: answer without a reasoning phase
 
 # Per-tool overrides. "ask" requires your confirmation each time; "deny"
 # disables the tool. Overrides can only make a tool stricter.
@@ -67,6 +68,7 @@ roots = []
 # kind = "openai_compatible"
 # base_url = "http://localhost:11434/v1"
 # model = "qwen3"
+# thinking = false   # Qwen3-family models: answer without a reasoning phase
 "#;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -122,7 +124,7 @@ mod hotkey_serde {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderConfig {
     #[serde(rename_all = "snake_case")]
     Anthropic {
@@ -142,6 +144,12 @@ pub enum ProviderConfig {
         model: String,
         #[serde(default = "default_max_tokens")]
         max_tokens: u32,
+        /// Turns the model's reasoning phase on or off per request, for
+        /// servers that read `chat_template_kwargs.enable_thinking`
+        /// (llama.cpp, vLLM) with models that support it (Qwen3 family).
+        /// Unset sends nothing, so other APIs never see the parameter.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thinking: Option<bool>,
     },
 }
 
@@ -181,6 +189,7 @@ impl ProviderConfig {
                 model,
                 base_url,
                 max_tokens,
+                ..
             } => (model, Some(base_url.as_str()), *max_tokens),
         };
         if model.trim().is_empty() {
@@ -300,6 +309,7 @@ mod tests {
                 base_url: "http://localhost:11434/v1".into(),
                 model: "qwen3".into(),
                 max_tokens: DEFAULT_MAX_TOKENS,
+                thinking: None,
             }
         );
         assert_eq!(c.tools["move_window"], Override::Ask);
@@ -344,6 +354,30 @@ mod tests {
                 "`{text}` gave `{err}`, expected `{needle}`"
             );
         }
+    }
+
+    #[test]
+    fn parses_thinking_and_rejects_unknown_provider_keys() {
+        let c = Config::parse(
+            "[compare]\nkind = \"openai_compatible\"\nbase_url = \"http://127.0.0.1:8090/v1\"\nmodel = \"q\"\nthinking = false",
+        )
+        .unwrap();
+        assert!(matches!(
+            c.compare,
+            Some(ProviderConfig::OpenaiCompatible {
+                thinking: Some(false),
+                ..
+            })
+        ));
+        // A typo is an error, not a silently ignored setting.
+        let err = Config::parse(
+            "[compare]\nkind = \"openai_compatible\"\nbase_url = \"http://x/v1\"\nmodel = \"q\"\nthinkng = false",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("thinkng"), "{err}");
+        // Anthropic has no such setting.
+        assert!(Config::parse("[provider]\nkind = \"anthropic\"\nthinking = false").is_err());
     }
 
     #[test]

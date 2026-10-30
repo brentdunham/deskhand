@@ -22,6 +22,9 @@ pub struct OpenAiConfig {
     pub api_key: Option<String>,
     pub model: String,
     pub max_tokens: u32,
+    /// Sent as `chat_template_kwargs.enable_thinking` when set. Unset sends
+    /// nothing, so APIs that reject unknown parameters are unaffected.
+    pub thinking: Option<bool>,
 }
 
 impl OpenAiConfig {
@@ -31,6 +34,7 @@ impl OpenAiConfig {
             api_key: None,
             model: model.into(),
             max_tokens: 4096,
+            thinking: None,
         }
     }
 }
@@ -43,6 +47,7 @@ impl std::fmt::Debug for OpenAiConfig {
             .field("has_api_key", &self.api_key.is_some())
             .field("model", &self.model)
             .field("max_tokens", &self.max_tokens)
+            .field("thinking", &self.thinking)
             .finish()
     }
 }
@@ -87,6 +92,9 @@ pub(crate) fn request_body(config: &OpenAiConfig, request: &ChatRequest) -> Valu
         "stream": true,
         "messages": messages,
     });
+    if let Some(thinking) = config.thinking {
+        body["chat_template_kwargs"] = json!({ "enable_thinking": thinking });
+    }
     if !request.tools.is_empty() {
         body["tools"] = request
             .tools
@@ -387,6 +395,26 @@ data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"function\":{\"name\":\"list_w
         assert!(matches!(decode_all(raw), Err(ProviderError::Api { .. })));
         let raw = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n";
         assert!(matches!(decode_all(raw), Err(ProviderError::Protocol(_))));
+    }
+
+    #[test]
+    fn thinking_is_sent_only_when_set() {
+        let request = ChatRequest {
+            system: String::new(),
+            messages: vec![],
+            tools: vec![],
+        };
+        let mut config = OpenAiConfig::new(OLLAMA_BASE_URL, "qwen3");
+        assert!(
+            request_body(&config, &request)
+                .get("chat_template_kwargs")
+                .is_none()
+        );
+        config.thinking = Some(false);
+        assert_eq!(
+            request_body(&config, &request)["chat_template_kwargs"]["enable_thinking"],
+            false
+        );
     }
 
     #[test]
