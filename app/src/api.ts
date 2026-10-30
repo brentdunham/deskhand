@@ -131,6 +131,7 @@ export const api = {
   setPanelMode: (expanded: boolean) => invoke<void>("set_panel_mode", { expanded }),
   resizePanel: (height: number) => invoke<void>("resize_panel", { height }),
   hidePanel: () => invoke<void>("hide_panel"),
+  startPanelDrag: () => invoke<void>("start_panel_drag"),
   insertText: (text: string) => invoke<void>("insert_text", { text }),
   cancelTurn: () => invoke<void>("cancel_turn"),
   answerConfirmation: (id: number, approved: boolean) =>

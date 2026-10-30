@@ -113,7 +113,15 @@ export default function CommandBar({
   return (
     <div className="bar" ref={rootRef} onKeyDown={onKeyDown}>
       <div className="bar-input-row">
-        <span className="bar-grip" data-tauri-drag-region title="Drag to move">
+        <span
+          className="bar-grip"
+          title="Drag to move"
+          onMouseDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            void api.startPanelDrag();
+          }}
+        >
           DH
         </span>
         <textarea

@@ -57,6 +57,14 @@ pub struct AppState {
     pub last_target: Mutex<Option<deskhand_win::window::WindowId>>,
     /// Expanded view (chat, activity, settings) rather than the command bar.
     pub expanded: AtomicBool,
+    /// A user drag of the bar is in progress (set by the grip, cleared when
+    /// the bar is positioned programmatically).
+    pub dragging: AtomicBool,
+    /// Where the user last dropped the bar (physical pixels); reused when
+    /// the bar opens on the same monitor. Not persisted across restarts.
+    pub user_position: Mutex<Option<(i32, i32)>>,
+    /// Hiding on blur is suppressed until this instant (during drags).
+    pub suppress_blur_until: Mutex<Option<std::time::Instant>>,
 }
 
 /// Poison only means a panic elsewhere; the data is still usable.
@@ -242,6 +250,9 @@ fn main() {
         capture_seq: std::sync::atomic::AtomicU64::new(0),
         last_target: Mutex::new(None),
         expanded: AtomicBool::new(false),
+        dragging: AtomicBool::new(false),
+        user_position: Mutex::new(None),
+        suppress_blur_until: Mutex::new(None),
     };
 
     tauri::Builder::default()
@@ -311,6 +322,9 @@ fn main() {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            WindowEvent::Moved(pos) => {
+                panel::on_moved(&window.state::<AppState>(), pos.x, pos.y);
+            }
             WindowEvent::Focused(false)
                 if panel::should_hide_on_blur(&window.state::<AppState>()) =>
             {
@@ -336,6 +350,7 @@ fn main() {
             panel::resize_panel,
             panel::hide_panel,
             panel::insert_text,
+            panel::start_panel_drag,
         ])
         .run(tauri::generate_context!())
         .expect("failed to start DeskHand");
