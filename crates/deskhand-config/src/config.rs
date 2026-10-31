@@ -69,6 +69,13 @@ roots = []
 # base_url = "http://localhost:11434/v1"
 # model = "qwen3"
 # thinking = false   # Qwen3-family models: answer without a reasoning phase
+
+# MCP servers whose tools DeskHand can use. Read-only tools run freely;
+# anything else asks first. Tool names are prefixed with the server name.
+#
+# [mcp.servers.fetch]
+# command = "uvx"
+# args = ["mcp-server-fetch"]
 "#;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -84,6 +91,60 @@ pub struct Config {
     /// A second model for compare mode. None disables compare.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compare: Option<ProviderConfig>,
+    pub mcp: McpConfig,
+}
+
+/// MCP servers whose tools DeskHand offers to the model.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct McpConfig {
+    /// Keyed by a short name that prefixes the server's tool names
+    /// (`fetch` gives `fetch__fetch`).
+    pub servers: BTreeMap<String, McpServerConfig>,
+}
+
+/// A local MCP server started over stdio.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpServerConfig {
+    /// Program to run, found on PATH like a shell would (`npx`, `uvx`).
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Extra environment variables for the server. Stored in this file as
+    /// plain text.
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Longest server name, so `name__tool` stays within model tool-name limits.
+pub const MAX_MCP_SERVER_NAME: usize = 24;
+
+impl McpConfig {
+    fn validate(&self) -> Result<(), String> {
+        for (name, server) in &self.servers {
+            if name.is_empty()
+                || name.len() > MAX_MCP_SERVER_NAME
+                || !name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                return Err(format!(
+                    "[mcp.servers.{name}]: server names must be 1 to {MAX_MCP_SERVER_NAME} letters, digits, '_' or '-'"
+                ));
+            }
+            if server.command.trim().is_empty() {
+                return Err(format!("[mcp.servers.{name}]: command is empty"));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +164,7 @@ impl Default for Config {
             tools: BTreeMap::new(),
             search: SearchConfig::default(),
             compare: None,
+            mcp: McpConfig::default(),
         }
     }
 }
@@ -243,6 +305,7 @@ impl Config {
                 ConfigError::Invalid(format!("[compare] {}", e.replace("provider.", "")))
             })?;
         }
+        config.mcp.validate().map_err(ConfigError::Invalid)?;
         Ok(config)
     }
 
@@ -378,6 +441,31 @@ mod tests {
         assert!(err.contains("thinkng"), "{err}");
         // Anthropic has no such setting.
         assert!(Config::parse("[provider]\nkind = \"anthropic\"\nthinking = false").is_err());
+    }
+
+    #[test]
+    fn parses_and_validates_mcp_servers() {
+        let c = Config::parse(
+            "[mcp.servers.fetch]\ncommand = \"uvx\"\nargs = [\"mcp-server-fetch\"]\n\n[mcp.servers.gh]\ncommand = \"npx\"\nenabled = false\nenv = { TOKEN = \"x\" }",
+        )
+        .unwrap();
+        let fetch = &c.mcp.servers["fetch"];
+        assert_eq!(fetch.args, ["mcp-server-fetch"]);
+        assert!(fetch.enabled);
+        assert!(!c.mcp.servers["gh"].enabled);
+        assert_eq!(c.mcp.servers["gh"].env["TOKEN"], "x");
+
+        for (text, needle) in [
+            (
+                "[mcp.servers.\"bad name\"]\ncommand = \"x\"",
+                "server names",
+            ),
+            ("[mcp.servers.ok]\ncommand = \" \"", "command is empty"),
+            ("[mcp.servers.ok]\ncommand = \"x\"\nargz = []", "argz"),
+        ] {
+            let err = Config::parse(text).unwrap_err().to_string();
+            assert!(err.contains(needle), "`{text}` gave `{err}`");
+        }
     }
 
     #[test]

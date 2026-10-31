@@ -172,6 +172,33 @@ export default function Settings({ status, onChange }: { status: Status; onChang
         </dd>
       </dl>
 
+      <h2>MCP servers</h2>
+      {status.mcp.length === 0 ? (
+        <p className="muted">
+          None configured. Add a <code>[mcp.servers.&lt;name&gt;]</code> section to the config file.
+        </p>
+      ) : (
+        <ul className="mcp-list">
+          {status.mcp.map((s) => (
+            <li key={s.name} className="mcp-server">
+              <div className="mcp-head">
+                <code>{s.name}</code>
+                <span className={s.state === "failed" ? "badge warn" : "badge"}>
+                  {s.state === "ready"
+                    ? `${s.tools} tool${s.tools === 1 ? "" : "s"}`
+                    : s.state}
+                </span>
+                <span className="muted mcp-command">{s.command}</span>
+              </div>
+              {s.state === "failed" && <p className="notice notice-error">{s.error}</p>}
+              {s.state === "ready" && s.skipped.length > 0 && (
+                <p className="muted">Skipped (name not usable): {s.skipped.join(", ")}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <h2>Config file</h2>
       <p className="muted path">{status.config_path}</p>
       <p className="muted">Changes apply as soon as you save the file.</p>

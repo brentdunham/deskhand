@@ -4,6 +4,7 @@
 mod commands;
 mod context;
 mod host;
+mod mcp;
 mod panel;
 mod secrets;
 
@@ -65,6 +66,8 @@ pub struct AppState {
     pub user_position: Mutex<Option<(i32, i32)>>,
     /// Hiding on blur is suppressed until this instant (during drags).
     pub suppress_blur_until: Mutex<Option<std::time::Instant>>,
+    /// Connected MCP servers and their status.
+    pub mcp: Mutex<mcp::McpState>,
 }
 
 /// Poison only means a panic elsewhere; the data is still usable.
@@ -122,6 +125,15 @@ fn apply_config(app: &AppHandle, config: Config) {
         config
             .unknown_tools(&known)
             .into_iter()
+            // MCP tools register after their server connects; overrides
+            // naming them are expected before then.
+            .filter(|t| {
+                !config
+                    .mcp
+                    .servers
+                    .keys()
+                    .any(|s| t.starts_with(&mcp::tool_prefix(s)))
+            })
             .map(|t| format!("[tools] has an override for `{t}`, which is not a DeskHand tool."))
             .collect()
     };
@@ -176,6 +188,9 @@ fn apply_config(app: &AppHandle, config: Config) {
         .search_roots
         .write()
         .unwrap_or_else(PoisonError::into_inner) = roots;
+
+    // Connects new or changed MCP servers in the background.
+    mcp::apply(app, &config.mcp);
 
     *lock(&state.config_warnings) = warnings;
     *state.config.write().unwrap_or_else(PoisonError::into_inner) = config;
@@ -253,6 +268,7 @@ fn main() {
         dragging: AtomicBool::new(false),
         user_position: Mutex::new(None),
         suppress_blur_until: Mutex::new(None),
+        mcp: Mutex::new(mcp::McpState::new()),
     };
 
     tauri::Builder::default()

@@ -829,3 +829,41 @@ kbd {
   gap: 0.3rem;
   padding: 0 0.5rem 0.45rem;
 }
+
+/* MCP servers in Settings */
+
+.mcp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mcp-server {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mcp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.mcp-command {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-server .notice {
+  margin: 0;
+}

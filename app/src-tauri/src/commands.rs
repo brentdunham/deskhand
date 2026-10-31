@@ -116,6 +116,7 @@ pub struct Status {
     config_error: Option<String>,
     config_warnings: Vec<String>,
     compare: Option<CompareStatus>,
+    mcp: Vec<crate::mcp::ServerView>,
 }
 
 fn kind_name(p: &ProviderConfig) -> &'static str {
@@ -164,6 +165,7 @@ pub fn status(state: State<'_, AppState>) -> Result<Status, String> {
             .cloned()
             .collect(),
         compare,
+        mcp: crate::mcp::statuses(&state),
     })
 }
 

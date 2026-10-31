@@ -18,6 +18,7 @@ serde_json.workspace = true
 
 deskhand-agent.workspace = true
 deskhand-config.workspace = true
+deskhand-mcp.workspace = true
 deskhand-policy.workspace = true
 deskhand-tools.workspace = true
 deskhand-win.workspace = true

@@ -593,6 +593,7 @@ version = "0.1.0-rc.1"
 dependencies = [
  "deskhand-agent",
  "deskhand-config",
+ "deskhand-mcp",
  "deskhand-policy",
  "deskhand-tools",
  "deskhand-win",

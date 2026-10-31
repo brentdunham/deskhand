@@ -34,7 +34,15 @@ export interface Status {
     base_url: string | null;
     kind: Provider;
   } | null;
+  mcp: McpServerStatus[];
 }
+
+export type McpServerStatus = { name: string; command: string } & (
+  | { state: "disabled" }
+  | { state: "connecting" }
+  | { state: "ready"; tools: number; skipped: string[] }
+  | { state: "failed"; error: string }
+);
 
 export type UiEvent =
   | { type: "text_delta"; text: string }
