@@ -478,7 +478,7 @@ mod tests {
         fn spec(&self) -> ToolSpec {
             ToolSpec::new(self.name, self.tier)
         }
-        fn description(&self) -> &'static str {
+        fn description(&self) -> &str {
             "fake"
         }
         fn input_schema(&self) -> Value {

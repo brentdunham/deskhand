@@ -14,7 +14,7 @@ pub struct RgbImage {
 /// Converts 32-bit BGRA (the Windows DIB layout) to RGB, dropping alpha.
 pub fn bgra_to_rgb(bgra: &[u8], width: u32, height: u32) -> RgbImage {
     let mut data = Vec::with_capacity(width as usize * height as usize * 3);
-    for px in bgra.chunks_exact(4) {
+    for px in bgra.as_chunks::<4>().0 {
         data.extend_from_slice(&[px[2], px[1], px[0]]);
     }
     RgbImage {
@@ -52,7 +52,7 @@ pub fn downscale(img: &RgbImage, max_edge: u32) -> RgbImage {
             let mut sum = [0u64; 3];
             for y in y0..y1 {
                 let row = &img.data[(y * sw + x0) * 3..(y * sw + x1) * 3];
-                for px in row.chunks_exact(3) {
+                for px in row.as_chunks::<3>().0 {
                     sum[0] += u64::from(px[0]);
                     sum[1] += u64::from(px[1]);
                     sum[2] += u64::from(px[2]);
@@ -118,7 +118,14 @@ mod tests {
         let img = solid(3000, 1500, [100, 150, 200]);
         let small = downscale(&img, 1568);
         assert_eq!((small.width, small.height), (1568, 784));
-        assert!(small.data.chunks_exact(3).all(|p| p == [100, 150, 200]));
+        assert!(
+            small
+                .data
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .all(|p| *p == [100, 150, 200])
+        );
 
         // Half white, half black averages to grey at 2x reduction.
         let mut stripes = solid(4, 2, [0, 0, 0]);

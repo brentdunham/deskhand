@@ -14,7 +14,7 @@ pub trait Tool: Send + Sync {
     fn spec(&self) -> ToolSpec;
 
     /// Shown to the model. Describe what the tool does and what it returns.
-    fn description(&self) -> &'static str;
+    fn description(&self) -> &str;
 
     /// JSON Schema for the arguments object.
     fn input_schema(&self) -> Value;
@@ -193,6 +193,23 @@ impl Toolbox {
         &mut self.policy
     }
 
+    /// Removes a tool and its policy entry, e.g. when an MCP server is
+    /// disconnected. Its past calls stay in the action log, but undo for them
+    /// is no longer possible. Returns whether the tool was registered.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        self.policy.unregister(name);
+        self.tools.remove(name).is_some()
+    }
+
+    /// Names of registered tools whose names start with `prefix`.
+    pub fn names_with_prefix(&self, prefix: &str) -> Vec<String> {
+        self.tools
+            .keys()
+            .filter(|n| n.starts_with(prefix))
+            .cloned()
+            .collect()
+    }
+
     pub fn log(&self) -> &ActionLog {
         &self.log
     }
@@ -336,7 +353,7 @@ mod tests {
             }
         }
 
-        fn description(&self) -> &'static str {
+        fn description(&self) -> &str {
             "fake"
         }
 
@@ -520,6 +537,24 @@ mod tests {
                 sources: vec![Source::Screen]
             }
         );
+    }
+
+    #[test]
+    fn unregister_removes_tool_and_denies_later_calls() {
+        let mut tb = Toolbox::new();
+        tb.register(Fake::new("srv__a", Tier::Read)).unwrap();
+        tb.register(Fake::new("srv__b", Tier::Read)).unwrap();
+        tb.register(Fake::new("other", Tier::Read)).unwrap();
+        assert_eq!(tb.names_with_prefix("srv__"), ["srv__a", "srv__b"]);
+
+        assert!(tb.unregister("srv__a"));
+        assert!(!tb.unregister("srv__a"));
+        assert!(matches!(
+            tb.authorize("srv__a", &json!({}), &ContextTaint::new()),
+            Authorization::Denied(DenyReason::UnknownTool)
+        ));
+        // The name is free to register again (a reconnected server).
+        tb.register(Fake::new("srv__a", Tier::Read)).unwrap();
     }
 
     #[test]

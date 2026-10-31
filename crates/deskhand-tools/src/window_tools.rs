@@ -98,7 +98,7 @@ impl Tool for ListWindows {
         ToolSpec::new("list_windows", Tier::Read)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "List open application windows (those shown in Alt+Tab), topmost first. \
          Returns window_id, title, app executable, monitor_id, state, and frame \
          (visible bounds in physical pixels). Titles are set by other \
@@ -127,7 +127,7 @@ impl Tool for ListMonitors {
         ToolSpec::new("list_monitors", Tier::Read)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "List monitors with monitor_id, bounds, work_area (bounds minus the \
          taskbar), and whether each is the primary monitor. Coordinates are \
          physical pixels in one virtual-screen space."
@@ -160,7 +160,7 @@ impl Tool for FocusWindow {
         ToolSpec::new("focus_window", Tier::Reversible)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Bring a window to the foreground, restoring it if minimized."
     }
 
@@ -197,7 +197,7 @@ impl Tool for SnapWindow {
         ToolSpec::new("snap_window", Tier::Reversible)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Snap a window to a region of a monitor's work area: a half, a quarter, \
          centered at two thirds size, or maximized. Uses the window's current \
          monitor unless monitor_id is given. Undoable."
@@ -259,7 +259,7 @@ impl Tool for MoveWindow {
         ToolSpec::new("move_window", Tier::Reversible)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Move and resize a window so its visible frame has the given position \
          and size in physical pixels. Restores the window first if it is \
          minimized or maximized. Undoable."
@@ -310,7 +310,7 @@ impl Tool for MinimizeWindow {
         ToolSpec::new("minimize_window", Tier::Reversible)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Minimize a window. Undoable."
     }
 
@@ -354,7 +354,7 @@ impl Tool for ReadWindowText {
         ToolSpec::new("read_window_text", Tier::Read)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Read a window's text through UI Automation: labels, buttons, list items, \
          and the full contents of documents and text fields. Password fields are \
          never read. To read the window the user was just using, call list_windows \

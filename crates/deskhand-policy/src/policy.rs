@@ -178,6 +178,12 @@ impl Policy {
         self.tools.get(tool)
     }
 
+    /// Removes a tool. Calls to it are denied as unknown from then on.
+    /// Overrides that name it are kept, as for not-yet-registered tools.
+    pub fn unregister(&mut self, tool: &str) -> bool {
+        self.tools.remove(tool).is_some()
+    }
+
     /// Sets or clears (`None`) a user override. Overrides for unregistered tools
     /// are kept, so config can name tools that a plugin registers later.
     pub fn set_override(&mut self, tool: impl Into<String>, value: Option<Override>) {

@@ -95,7 +95,7 @@ impl Tool for SearchFiles {
         ToolSpec::new("search_files", Tier::Read)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Find files and folders by name in the user's folders (by default Desktop, \
          Documents, Downloads, Pictures, Music, and Videos). Every word in the query \
          must appear in the name; case does not matter. Shallower matches come first. \
@@ -166,7 +166,7 @@ impl Tool for CreateFolder {
         ToolSpec::new("create_folder", Tier::Reversible)
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Create a folder, including any missing parent folders, inside the user's \
          folders. Takes an absolute path. Undoable while the new folders are still empty."
     }
@@ -245,7 +245,7 @@ impl Tool for MovePath {
         ToolSpec::new("move_path", Tier::Reversible).taint_sensitive()
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Move or rename a file or folder within the user's folders. `to` is the full \
          new path and must not exist: nothing is ever overwritten. Moves between \
          drives are not supported. Undoable."
@@ -324,7 +324,7 @@ mod shell_tools {
             ToolSpec::new("open_path", Tier::Reversible).taint_sensitive()
         }
 
-        fn description(&self) -> &'static str {
+        fn description(&self) -> &str {
             "Open a document with its default app, or a folder in File Explorer. Only \
              paths inside the user's folders. Programs, scripts, installers, and \
              shortcuts are refused because opening them runs code. Not undoable: close \
@@ -399,7 +399,7 @@ mod shell_tools {
             ToolSpec::new("open_url", Tier::Reversible).taint_sensitive()
         }
 
-        fn description(&self) -> &'static str {
+        fn description(&self) -> &str {
             "Open an http or https URL in the default browser. Not undoable."
         }
 
@@ -429,7 +429,7 @@ mod shell_tools {
             ToolSpec::new("recycle_path", Tier::Irreversible)
         }
 
-        fn description(&self) -> &'static str {
+        fn description(&self) -> &str {
             "Move a file or folder inside the user's folders to the Recycle Bin. Always \
              asks the user first. DeskHand cannot undo this; the user can restore the \
              item from the Recycle Bin."
