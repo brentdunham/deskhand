@@ -118,6 +118,9 @@ pub fn apply(app: &AppHandle, config: &McpConfig) {
     let mut guard = lock(&state.mcp);
     let mcp = &mut *guard;
     let runtime = mcp.runtime().handle().clone();
+    // Each server runs in its own folder, so files it writes relative to its
+    // working directory (Playwright's screenshots) land somewhere writable.
+    let work_root = app.path().app_local_data_dir().ok().map(|d| d.join("mcp"));
     // Sessions and tools hold child processes and tasks; drop them in the
     // runtime's context.
     let _enter = runtime.enter();
@@ -160,6 +163,7 @@ pub fn apply(app: &AppHandle, config: &McpConfig) {
             command: cfg.command.clone(),
             args: cfg.args.clone(),
             env: cfg.env.clone(),
+            working_dir: work_root.as_ref().map(|root| root.join(name)),
         };
         let (app, name, handle) = (app.clone(), name.clone(), runtime.clone());
         runtime.spawn(async move {

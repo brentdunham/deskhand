@@ -22,4 +22,5 @@ workspace = true
 [dev-dependencies]
 rmcp = { version = "3.8.0", features = ["server", "macros", "schemars", "client", "transport-async-rw"] }
 schemars = "1.2.3"
+tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["macros"] }

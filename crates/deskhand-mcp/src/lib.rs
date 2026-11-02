@@ -38,6 +38,11 @@ pub struct StdioServer {
     pub args: Vec<String>,
     /// Added to DeskHand's own environment for the child.
     pub env: BTreeMap<String, String>,
+    /// The server's working directory. Many servers write files relative to
+    /// it (Playwright saves screenshots there), so it should be a folder
+    /// DeskHand owns, not wherever DeskHand happened to start. Created if
+    /// missing. `None` inherits DeskHand's.
+    pub working_dir: Option<std::path::PathBuf>,
 }
 
 /// How long a server gets to start and complete the handshake. `npx` and
@@ -66,6 +71,11 @@ pub async fn connect_stdio(server: &StdioServer) -> Result<Arc<Session>, String>
         .envs(&server.env)
         .stderr(std::process::Stdio::null())
         .kill_on_drop(true);
+    if let Some(dir) = &server.working_dir {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+        cmd.current_dir(dir);
+    }
     #[cfg(windows)]
     {
         // A console program started from a GUI app opens a console window
@@ -78,25 +88,45 @@ pub async fn connect_stdio(server: &StdioServer) -> Result<Arc<Session>, String>
     connect(transport).await
 }
 
-/// Finds a command on PATH the way a shell would. On Windows this includes
-/// `.cmd` and `.bat` scripts such as `npx.cmd`, which `Command::new("npx")`
-/// does not find; Rust runs those through cmd.exe with safe argument quoting.
+/// Finds a command on PATH the way Windows does. Only runnable files
+/// qualify: npm installs an extensionless bash script (`npx`) next to
+/// `npx.cmd`, and the script must not be picked. `.cmd` and `.bat` files are
+/// run by Rust through cmd.exe with safe argument quoting.
 pub fn resolve_command(command: &str) -> Option<std::path::PathBuf> {
     let path = std::path::Path::new(command);
     if path.components().count() > 1 || path.is_absolute() {
-        return path.is_file().then(|| path.to_owned());
+        return (path.is_file() && runnable(path)).then(|| path.to_owned());
     }
-    let exts: &[&str] = if cfg!(windows) {
-        &["", ".exe", ".cmd", ".bat", ".com"]
+    let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&std::env::var_os("PATH")?).collect();
+    resolve_in(command, &dirs)
+}
+
+/// Windows' default PATHEXT order.
+const EXECUTABLE_EXTS: &[&str] = &["com", "exe", "bat", "cmd"];
+
+fn runnable(path: &std::path::Path) -> bool {
+    !cfg!(windows)
+        || path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| EXECUTABLE_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+}
+
+/// The lookup behind [`resolve_command`], over explicit directories.
+pub fn resolve_in(command: &str, dirs: &[std::path::PathBuf]) -> Option<std::path::PathBuf> {
+    let names: Vec<String> = if cfg!(windows) && !runnable(std::path::Path::new(command)) {
+        EXECUTABLE_EXTS
+            .iter()
+            .map(|ext| format!("{command}.{ext}"))
+            .collect()
     } else {
-        &[""]
+        vec![command.to_owned()]
     };
-    let dirs = std::env::var_os("PATH")?;
-    std::env::split_paths(&dirs).find_map(|dir| {
-        exts.iter().find_map(|ext| {
-            let candidate = dir.join(format!("{command}{ext}"));
-            candidate.is_file().then_some(candidate)
-        })
+    dirs.iter().find_map(|dir| {
+        names
+            .iter()
+            .map(|n| dir.join(n))
+            .find(|candidate| candidate.is_file())
     })
 }
 
