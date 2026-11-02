@@ -39,6 +39,18 @@ impl TestServer {
             "refused: read-only disk",
         )]))
     }
+
+    #[tool(
+        description = "Render a chart",
+        annotations(read_only_hint = true, open_world_hint = false)
+    )]
+    async fn picture(&self) -> Result<CallToolResult, ErrorData> {
+        Ok(CallToolResult::success(vec![
+            ContentBlock::text("a chart"),
+            ContentBlock::image("iVBORw0KGgo=", "image/png"),
+            ContentBlock::image("Qk0=", "image/bmp"),
+        ]))
+    }
 }
 
 fn runtime() -> tokio::runtime::Runtime {
@@ -76,7 +88,10 @@ fn registers_namespaced_tools_with_mapped_policy() {
     let rt = runtime();
     let mut tb = toolbox(&rt);
     let names: Vec<String> = tb.definitions().into_iter().map(|d| d.name).collect();
-    assert_eq!(names, ["test__echo", "test__fetch", "test__wipe"]);
+    assert_eq!(
+        names,
+        ["test__echo", "test__fetch", "test__picture", "test__wipe"]
+    );
 
     let clean = ContextTaint::new();
     let mut tainted = ContextTaint::new();
@@ -115,6 +130,30 @@ fn calls_return_untrusted_text_and_taint_the_context() {
     assert_eq!(out.result.unwrap()["text"], "hello over MCP");
     assert_eq!(out.untrusted, Some(Source::ToolOutput));
     assert!(taint.is_tainted());
+}
+
+#[test]
+fn supported_images_pass_through_and_others_are_reported() {
+    let rt = runtime();
+    let mut tb = toolbox(&rt);
+    let mut taint = ContextTaint::new();
+    let Authorization::Permitted(p) = tb.authorize("test__picture", &json!({}), &taint) else {
+        panic!("picture should be permitted");
+    };
+    let out = tb.execute(p, json!({}), &mut taint);
+    let content = out.result.unwrap();
+    assert_eq!(content["text"], "a chart");
+    assert_eq!(content["images_attached"], 1);
+    assert!(
+        content["omitted"][0]
+            .as_str()
+            .unwrap()
+            .contains("image/bmp is not supported")
+    );
+    assert_eq!(out.images.len(), 1);
+    assert_eq!(out.images[0].media_type, "image/png");
+    assert_eq!(out.images[0].base64, "iVBORw0KGgo=");
+    assert_eq!(out.untrusted, Some(Source::ToolOutput));
 }
 
 #[test]

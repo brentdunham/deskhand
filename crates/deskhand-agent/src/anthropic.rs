@@ -104,15 +104,33 @@ fn message_json(m: &Message) -> Value {
                 tool_use_id,
                 content,
                 is_error,
-            } => json!({
-                "type": "tool_result",
-                "tool_use_id": tool_use_id,
-                "content": content,
-                "is_error": is_error,
-            }),
+                images,
+            } => {
+                // Images go inside the tool result, after its text.
+                let body = if images.is_empty() {
+                    json!(content)
+                } else {
+                    let mut parts = vec![json!({ "type": "text", "text": content })];
+                    parts.extend(images.iter().map(image_json));
+                    json!(parts)
+                };
+                json!({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use_id,
+                    "content": body,
+                    "is_error": is_error,
+                })
+            }
         })
         .collect();
     json!({ "role": role, "content": content })
+}
+
+fn image_json(img: &crate::message::ImageData) -> Value {
+    json!({
+        "type": "image",
+        "source": { "type": "base64", "media_type": img.media_type, "data": img.base64 },
+    })
 }
 
 enum Partial {
@@ -378,6 +396,7 @@ data: {\"type\":\"message_stop\"}
                         tool_use_id: "t1".into(),
                         content: "[]".into(),
                         is_error: false,
+                        images: vec![],
                     }],
                 },
             ],
@@ -389,6 +408,34 @@ data: {\"type\":\"message_stop\"}
         assert!(body.get("tools").is_none());
         assert_eq!(body["messages"][1]["content"][0]["type"], "tool_use");
         assert_eq!(body["messages"][2]["content"][0]["tool_use_id"], "t1");
+    }
+
+    #[test]
+    fn tool_result_images_go_inside_the_result() {
+        let body = request_body(
+            &AnthropicConfig::new("k"),
+            &ChatRequest {
+                system: String::new(),
+                messages: vec![Message {
+                    role: Role::User,
+                    content: vec![Block::ToolResult {
+                        tool_use_id: "t1".into(),
+                        content: "{\"images_attached\":1}".into(),
+                        is_error: false,
+                        images: vec![crate::message::ImageData {
+                            media_type: "image/png".into(),
+                            base64: "iVBOR".into(),
+                        }],
+                    }],
+                }],
+                tools: vec![],
+            },
+        );
+        let result = &body["messages"][0]["content"][0];
+        assert_eq!(result["type"], "tool_result");
+        assert_eq!(result["content"][0]["type"], "text");
+        assert_eq!(result["content"][1]["type"], "image");
+        assert_eq!(result["content"][1]["source"]["data"], "iVBOR");
     }
 
     #[test]

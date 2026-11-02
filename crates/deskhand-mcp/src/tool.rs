@@ -2,7 +2,7 @@ use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 use deskhand_policy::{Permit, Source, Tier, ToolSpec};
-use deskhand_tools::{Tool, ToolError, ToolOutput};
+use deskhand_tools::{Tool, ToolError, ToolImage, ToolOutput};
 use rmcp::model::{CallToolRequestParams, CallToolResult, ContentBlock};
 use serde_json::{Value, json};
 
@@ -55,19 +55,42 @@ pub fn spec_for(name: &str, tool: &rmcp::model::Tool) -> ToolSpec {
     }
 }
 
+/// Image formats both model APIs accept.
+const IMAGE_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
+/// Anthropic rejects images over 5 MB; base64 is 4/3 of the raw size.
+const MAX_IMAGE_BASE64: usize = 5 * 1024 * 1024 * 4 / 3;
+/// Images per result; each costs well over a thousand input tokens.
+const MAX_IMAGES: usize = 4;
+
 /// Flattens a tool result for the model: text blocks joined, structured
-/// content included, other block kinds noted rather than dropped silently.
+/// content included, images passed through within the limits above, and
+/// anything else noted with the reason rather than dropped silently.
 pub fn result_to_output(result: CallToolResult) -> Result<ToolOutput, ToolError> {
     let mut text = Vec::new();
-    let mut omitted = Vec::new();
+    let mut images = Vec::new();
+    let mut omitted: Vec<String> = Vec::new();
     for block in &result.content {
         match block {
             ContentBlock::Text(t) => text.push(t.text.clone()),
-            ContentBlock::Image(_) => omitted.push("image"),
-            ContentBlock::Audio(_) => omitted.push("audio"),
-            ContentBlock::Resource(_) => omitted.push("embedded resource"),
-            ContentBlock::ResourceLink(_) => omitted.push("resource link"),
-            _ => omitted.push("other content"),
+            ContentBlock::Image(img) => {
+                let media_type = img.mime_type.to_ascii_lowercase();
+                if !IMAGE_TYPES.contains(&media_type.as_str()) {
+                    omitted.push(format!("image ({media_type} is not supported)"));
+                } else if img.data.len() > MAX_IMAGE_BASE64 {
+                    omitted.push("image (larger than 5 MB)".into());
+                } else if images.len() >= MAX_IMAGES {
+                    omitted.push(format!("image (more than {MAX_IMAGES} in one result)"));
+                } else {
+                    images.push(ToolImage {
+                        media_type,
+                        base64: img.data.clone(),
+                    });
+                }
+            }
+            ContentBlock::Audio(_) => omitted.push("audio".into()),
+            ContentBlock::Resource(_) => omitted.push("embedded resource".into()),
+            ContentBlock::ResourceLink(_) => omitted.push("resource link".into()),
+            _ => omitted.push("other content".into()),
         }
     }
     let joined = text.join("\n");
@@ -82,10 +105,15 @@ pub fn result_to_output(result: CallToolResult) -> Result<ToolOutput, ToolError>
     if let Some(structured) = result.structured_content {
         content["structured"] = structured;
     }
+    if !images.is_empty() {
+        content["images_attached"] = json!(images.len());
+    }
     if !omitted.is_empty() {
         content["omitted"] = json!(omitted);
     }
-    Ok(ToolOutput::new(content).untrusted(Source::ToolOutput))
+    let mut out = ToolOutput::new(content).untrusted(Source::ToolOutput);
+    out.images = images;
+    Ok(out)
 }
 
 /// A remote tool registered in the toolbox.

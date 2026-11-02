@@ -30,14 +30,36 @@ pub trait Tool: Send + Sync {
     }
 }
 
+/// An image a tool returns for the model to see.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ToolImage {
+    /// e.g. `image/png`.
+    pub media_type: String,
+    /// Base64, without a `data:` prefix.
+    pub base64: String,
+}
+
+// Base64 payloads are large; keep them out of debug output.
+impl fmt::Debug for ToolImage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ToolImage")
+            .field("media_type", &self.media_type)
+            .field("base64_len", &self.base64.len())
+            .finish()
+    }
+}
+
 /// What a tool returns on success.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolOutput {
     /// Returned to the model.
     pub content: Value,
+    /// Returned to the model alongside `content`.
+    pub images: Vec<ToolImage>,
     /// Stored in the action log; passed back to [`Tool::undo`].
     pub undo: Option<Value>,
-    /// Set when `content` includes text from outside DeskHand's control.
+    /// Set when `content` or `images` include material from outside
+    /// DeskHand's control.
     pub untrusted: Option<Source>,
 }
 
@@ -45,9 +67,15 @@ impl ToolOutput {
     pub fn new(content: Value) -> Self {
         Self {
             content,
+            images: Vec::new(),
             undo: None,
             untrusted: None,
         }
+    }
+
+    pub fn with_image(mut self, image: ToolImage) -> Self {
+        self.images.push(image);
+        self
     }
 
     pub fn with_undo(mut self, undo: Value) -> Self {
@@ -107,6 +135,8 @@ pub struct ToolDefinition {
 pub struct CallOutcome {
     pub action_id: ActionId,
     pub result: Result<Value, ToolError>,
+    /// Images the tool returned; empty on failure.
+    pub images: Vec<ToolImage>,
     /// Set when the result carries untrusted content. The context has
     /// already been tainted; the agent should also label the content as
     /// untrusted when it returns it to the model.
@@ -267,6 +297,7 @@ impl Toolbox {
                 CallOutcome {
                     action_id: id,
                     result: Ok(out.content),
+                    images: out.images,
                     untrusted: out.untrusted,
                 }
             }
@@ -277,6 +308,7 @@ impl Toolbox {
                 CallOutcome {
                     action_id: id,
                     result: Err(e),
+                    images: Vec::new(),
                     untrusted: None,
                 }
             }

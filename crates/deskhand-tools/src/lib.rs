@@ -21,5 +21,5 @@ mod toolbox;
 pub mod window_tools;
 
 pub use toolbox::{
-    CallOutcome, Tool, ToolDefinition, ToolError, ToolOutput, Toolbox, ToolboxError,
+    CallOutcome, Tool, ToolDefinition, ToolError, ToolImage, ToolOutput, Toolbox, ToolboxError,
 };

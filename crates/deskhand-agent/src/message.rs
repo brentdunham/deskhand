@@ -34,6 +34,8 @@ pub enum Block {
         tool_use_id: String,
         content: String,
         is_error: bool,
+        /// Images the tool returned; untrusted like the content.
+        images: Vec<ImageData>,
     },
 }
 
